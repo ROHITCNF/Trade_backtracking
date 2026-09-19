@@ -1,0 +1,18 @@
+{
+  "name": "backtestv2",
+  "version": "1.0.0",
+  "description": "backtest ORB strategy",
+  "license": "ISC",
+  "author": "cnF",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "report": "node index.js && open out/report.html",
+    "sweep": "node sweep.js",
+    "all": "node runAll.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

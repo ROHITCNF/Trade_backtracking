@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ORB Backtest Report</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #262b36;
+    --text: #e6e9ef;
+    --muted: #8b93a7;
+    --green: #26a69a;
+    --red: #ef5350;
+    --accent: #5b8def;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  #tickerPicker {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 12px; font-size: 14px; min-width: 200px; cursor: pointer;
+  }
+  #tickerPicker:hover { border-color: var(--accent); }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px; margin-bottom: 20px;
+  }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .card .value { font-size: 22px; font-weight: 650; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--green); } .neg { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; cursor: pointer; user-select: none; }
+  th:hover { color: var(--text); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: #1e222b; }
+  tbody tr.active { background: #223055; }
+  .tag { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .tag.TARGET { background: rgba(38,166,154,.15); color: var(--green); }
+  .tag.SL { background: rgba(239,83,80,.15); color: var(--red); }
+  .tag.EOD { background: rgba(139,147,167,.15); color: var(--muted); }
+  .scroll { max-height: 420px; overflow: auto; }
+  .hint { color: var(--muted); font-size: 12px; }
+  #dayChart { height: 400px; }
+  #equityChart { height: 260px; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 110px; }
+  .bars div { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 1px; }
+  .barLabels { display: flex; gap: 3px; margin-top: 6px; color: var(--muted); font-size: 10px; }
+  .barLabels span { flex: 1; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1 id="title">ORB Backtest</h1>
+    <div class="sub" id="subtitle"></div>
+  </div>
+  <select id="tickerPicker" hidden></select>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<!-- Hidden for now. Delete the style attribute to bring either panel back. -->
+<div class="panel" style="display:none">
+  <h2>Equity curve (cumulative P&amp;L, ₹)</h2>
+  <div id="equityChart"></div>
+</div>
+
+<div class="panel" style="display:none">
+  <h2>Return distribution (P&amp;L % per trade)</h2>
+  <div class="bars" id="histogram"></div>
+  <div class="barLabels" id="histogramLabels"></div>
+</div>
+
+<div class="panel">
+  <h2 id="dayTitle">Day chart</h2>
+  <div class="hint" id="dayHint">Click any row below to inspect that day.</div>
+  <div id="dayChart"></div>
+</div>
+
+<div class="panel">
+  <h2>Trades</h2>
+  <div class="scroll">
+    <table id="tradeTable">
+      <thead>
+        <tr>
+          <th data-key="date">Date</th>
+          <th data-key="side">Side</th>
+          <th data-key="entryTime">Entry @</th>
+          <th data-key="entry">Entry</th>
+          <th data-key="sl">SL</th>
+          <th data-key="target">Target</th>
+          <th data-key="exitTime">Exit @</th>
+          <th data-key="exit">Exit</th>
+          <th data-key="reason">Why</th>
+          <th data-key="pnl">P&amp;L ₹</th>
+          <th data-key="pnlPct">P&amp;L %</th>
+          <th data-key="rMultiple">R</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const IST = 5.5 * 3600; // shift epochs so the chart's UTC axis reads as IST
+const money = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
+const cls = (n) => (n >= 0 ? 'pos' : 'neg');
+
+/* ---------- ticker dropdown ---------- */
+// Each ticker is its own generated page; selecting one just navigates there.
+if (DATA.tickers && DATA.tickers.length > 1) {
+  const picker = document.getElementById('tickerPicker');
+  picker.hidden = false;
+  picker.innerHTML = DATA.tickers
+    .map((t) => `<option value="${t.file}"${t.symbol === DATA.config.symbol ? ' selected' : ''}>${t.symbol}</option>`)
+    .join('');
+  picker.onchange = () => { window.location.href = picker.value; };
+}
+
+/* ---------- stat cards ---------- */
+const m = DATA.metrics;
+document.getElementById('title').textContent = DATA.config.symbol + ' — Opening Range Breakout';
+const describeTarget = (c) =>
+  c.targetMode === 'none' ? 'no target' : c.targetMode === 'pct' ? `target ${c.targetPct}%` : `target ${c.targetR}R`;
+const describeStop = (c) => (c.slMode === 'range' ? 'SL at range edge' : `SL ${c.slPct}%`);
+
+document.getElementById('subtitle').textContent =
+  `${DATA.config.fromDate} to ${DATA.config.toDate} · ${DATA.config.resolution}-min candles · ` +
+  `range ${DATA.config.orbStart}-${DATA.config.orbEnd} · ${DATA.config.direction} · ` +
+  `${describeTarget(DATA.config)} · ${describeStop(DATA.config)} · ` +
+  `qty ${DATA.config.quantity} · costs ${DATA.config.costBps} bps`;
+
+const cards = [
+  ['Trades', m.totalTrades, ''],
+  ['Win rate', m.winRate + '%', ''],
+  ['Total P&L', money(m.totalPnl), cls(m.totalPnl)],
+  ['Expectancy / trade', money(m.expectancy), cls(m.expectancy)],
+  ['Profit factor', m.profitFactor === null ? '—' : m.profitFactor, m.profitFactor >= 1 ? 'pos' : 'neg'],
+  ['Avg R', m.avgR, cls(m.avgR)],
+  ['Avg win', money(m.avgWin), 'pos'],
+  ['Avg loss', money(m.avgLoss), 'neg'],
+  ['Max drawdown', '-' + m.maxDrawdown.toFixed(2), 'neg'],
+  ['Best trade', money(m.bestTrade), 'pos'],
+  ['Worst trade', money(m.worstTrade), 'neg'],
+  ['Exits', Object.entries(m.byReason).map(([k, v]) => `${k} ${v}`).join(' · ') || '—', ''],
+];
+document.getElementById('cards').innerHTML = cards
+  .map(([label, value, c]) => `<div class="card"><div class="label">${label}</div><div class="value ${c}">${value}</div></div>`)
+  .join('');
+
+/* ---------- equity curve ---------- */
+const chartTheme = {
+  layout: { background: { color: 'transparent' }, textColor: '#8b93a7' },
+  grid: { vertLines: { color: '#222732' }, horzLines: { color: '#222732' } },
+  rightPriceScale: { borderColor: '#262b36' },
+  timeScale: { borderColor: '#262b36' },
+};
+
+const equityChart = LightweightCharts.createChart(document.getElementById('equityChart'), {
+  ...chartTheme,
+  height: 260,
+  autoSize: true,
+});
+const equitySeries = equityChart.addAreaSeries({
+  lineColor: '#5b8def', topColor: 'rgba(91,141,239,.35)', bottomColor: 'rgba(91,141,239,0)', lineWidth: 2,
+});
+equitySeries.setData(m.curve.map((p) => ({ time: p.date, value: p.equity })));
+equityChart.timeScale().fitContent();
+
+/* ---------- return histogram ---------- */
+(function buildHistogram() {
+  const values = DATA.trades.map((t) => t.pnlPct);
+  if (!values.length) return;
+  const min = Math.min(...values), max = Math.max(...values);
+  const bins = 20;
+  const width = (max - min) / bins || 1;
+  const counts = new Array(bins).fill(0);
+  for (const v of values) counts[Math.min(bins - 1, Math.floor((v - min) / width))]++;
+  const peak = Math.max(...counts);
+  document.getElementById('histogram').innerHTML = counts
+    .map((c, i) => {
+      const mid = min + width * (i + 0.5);
+      const color = mid >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div style="height:${(c / peak) * 100}%;background:${color}" title="${c} trades near ${mid.toFixed(2)}%"></div>`;
+    })
+    .join('');
+  document.getElementById('histogramLabels').innerHTML =
+    `<span style="text-align:left">${min.toFixed(1)}%</span><span>0</span><span style="text-align:right">${max.toFixed(1)}%</span>`;
+})();
+
+/* ---------- day chart ---------- */
+const dayChart = LightweightCharts.createChart(document.getElementById('dayChart'), {
+  ...chartTheme,
+  height: 400,
+  autoSize: true,
+  timeScale: { ...chartTheme.timeScale, timeVisible: true, secondsVisible: false },
+});
+const candleSeries = dayChart.addCandlestickSeries({
+  upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
+  wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+});
+let priceLines = [];
+
+function showDay(trade) {
+  candleSeries.setData(
+    trade.candles.map(([t, o, h, l, c]) => ({ time: t + IST, open: o, high: h, low: l, close: c }))
+  );
+
+  for (const line of priceLines) candleSeries.removePriceLine(line);
+  priceLines = [
+    { price: trade.orbHigh, color: '#8b93a7', title: 'ORB high' },
+    { price: trade.orbLow, color: '#8b93a7', title: 'ORB low' },
+    { price: trade.entry, color: '#5b8def', title: 'Entry' },
+    { price: trade.sl, color: '#ef5350', title: 'SL' },
+    // targetMode 'none' leaves no target line to draw.
+    ...(trade.target === null ? [] : [{ price: trade.target, color: '#26a69a', title: 'Target' }]),
+  ].map((o) =>
+    candleSeries.createPriceLine({
+      ...o, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true,
+    })
+  );
+
+  candleSeries.setMarkers([
+    {
+      time: trade.entryTs + IST, position: trade.side === 'long' ? 'belowBar' : 'aboveBar',
+      color: '#5b8def', shape: trade.side === 'long' ? 'arrowUp' : 'arrowDown',
+      text: 'ENTRY ' + trade.entry,
+    },
+    {
+      time: trade.exitTs + IST, position: trade.side === 'long' ? 'aboveBar' : 'belowBar',
+      color: trade.pnl >= 0 ? '#26a69a' : '#ef5350', shape: 'circle',
+      text: trade.reason + ' ' + trade.exit,
+    },
+  ]);
+
+  dayChart.timeScale().fitContent();
+  document.getElementById('dayTitle').textContent =
+    `${trade.date} · ${trade.side} · ${trade.reason} · ${money(trade.pnl)} (${trade.rMultiple}R)`;
+  document.getElementById('dayHint').textContent =
+    `Opening range ${trade.orbLow} – ${trade.orbHigh} (risk ${(trade.entry - trade.sl).toFixed(2)}). ` +
+    `Entered ${trade.entryTime} at ${trade.entry}, exited ${trade.exitTime} at ${trade.exit}.`;
+}
+
+/* ---------- trade table ---------- */
+const tbody = document.querySelector('#tradeTable tbody');
+let sortKey = 'date';
+let sortAsc = true;
+
+function renderTable() {
+  const rows = [...DATA.trades].sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    const cmp = typeof x === 'number' ? x - y : String(x).localeCompare(String(y));
+    return sortAsc ? cmp : -cmp;
+  });
+
+  tbody.innerHTML = rows
+    .map(
+      (t) => `<tr data-date="${t.date}">
+        <td>${t.date}</td><td>${t.side}</td><td>${t.entryTime}</td>
+        <td>${t.entry}</td><td>${t.sl}</td><td>${t.target === null ? '—' : t.target}</td>
+        <td>${t.exitTime}</td><td>${t.exit}</td>
+        <td><span class="tag ${t.reason}">${t.reason}</span></td>
+        <td class="${cls(t.pnl)}">${money(t.pnl)}</td>
+        <td class="${cls(t.pnlPct)}">${money(t.pnlPct)}</td>
+        <td class="${cls(t.rMultiple)}">${t.rMultiple}</td>
+      </tr>`
+    )
+    .join('');
+
+  for (const tr of tbody.querySelectorAll('tr')) {
+    tr.onclick = () => {
+      tbody.querySelector('tr.active')?.classList.remove('active');
+      tr.classList.add('active');
+      showDay(DATA.trades.find((t) => t.date === tr.dataset.date));
+    };
+  }
+}
+
+for (const th of document.querySelectorAll('#tradeTable th')) {
+  th.onclick = () => {
+    const key = th.dataset.key;
+    sortAsc = key === sortKey ? !sortAsc : true;
+    sortKey = key;
+    renderTable();
+  };
+}
+
+renderTable();
+if (DATA.trades.length) {
+  tbody.querySelector('tr').classList.add('active');
+  showDay(DATA.trades[0]);
+}
+</script>
+</body>
+</html>
