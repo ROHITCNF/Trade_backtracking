@@ -1,22 +1,23 @@
-// Reads the comma-separated watchlist in _F&O.txt.
+// Reads a comma-separated watchlist file from the project root.
 
 const fs = require('fs');
 const path = require('path');
 
-const FILE = path.join(__dirname, '..', '_F&O.txt');
+const DEFAULT_LIST = '_F&O.txt';
 
 // 'NSE:RVNL-EQ' -> 'NSE_RVNL_EQ' (used for both cache and report filenames)
 function toFileName(symbol) {
   return symbol.replace(/[^A-Za-z0-9]/g, '_');
 }
 
-function readTickers() {
-  if (!fs.existsSync(FILE)) throw new Error(`Watchlist not found: ${FILE}`);
+function readTickers(listFile = DEFAULT_LIST) {
+  const file = path.join(__dirname, '..', listFile);
+  if (!fs.existsSync(file)) throw new Error(`Watchlist not found: ${file}`);
 
   return [
     ...new Set(
       fs
-        .readFileSync(FILE, 'utf8')
+        .readFileSync(file, 'utf8')
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
@@ -24,4 +25,4 @@ function readTickers() {
   ];
 }
 
-module.exports = { readTickers, toFileName };
+module.exports = { readTickers, toFileName, DEFAULT_LIST };

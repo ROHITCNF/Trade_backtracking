@@ -9,7 +9,7 @@ const TRADES_DIR = path.join(__dirname, '..', 'data', 'trades');
 
 const COLUMNS = [
   'date', 'side', 'entryTime', 'entry', 'sl', 'target',
-  'exitTime', 'exit', 'reason', 'pnl', 'pnlPct', 'rMultiple',
+  'exitTime', 'exit', 'reason', 'quantity', 'notional', 'pnl', 'pnlPct', 'rMultiple',
 ];
 
 function toCsv(trades) {

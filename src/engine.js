@@ -99,6 +99,28 @@ function checkExit(candle, position) {
   return null;
 }
 
+// How many shares to take. With broker margin you only put up a fraction of the
+// notional, so capitalPerTrade of margin at `leverage` controls that much more
+// stock: qty = capitalPerTrade x leverage / price.
+//
+//   'fixed'      -> config.quantity, unchanged
+//   'entryPrice' -> priced off each trade's own entry, so a January trade is
+//                   sized with January's price. Correct for a backtest.
+//   'ltp'        -> priced off today's last traded price, which is how you would
+//                   size the trade if you placed it now. Applying today's price
+//                   to months-old trades distorts them, badly for anything that
+//                   has re-rated — useful for planning live size, not for judging
+//                   historical performance.
+function resolveQuantity(entry, config) {
+  if (config.sizing === 'fixed' || !config.sizing) return config.quantity;
+
+  const price = config.sizing === 'ltp' ? config.ltp : entry;
+  if (!price) throw new Error(`sizing '${config.sizing}' needs a price for ${config.symbol}`);
+
+  // Never round down to zero — a stock priced above the whole notional gets 1.
+  return Math.max(1, Math.floor((config.capitalPerTrade * config.leverage) / price));
+}
+
 function simulateDay(date, candles, config) {
   const orb = openingRange(candles, config);
   if (!orb) return null;
@@ -146,10 +168,11 @@ function simulateDay(date, candles, config) {
 
 function buildTrade({ date, orb, position, exitPrice, reason, candle, config, candles }) {
   const sign = position.side === 'long' ? 1 : -1;
-  const gross = (exitPrice - position.entry) * sign * config.quantity;
-  const cost = ((position.entry + exitPrice) * config.quantity * config.costBps) / 10000;
+  const quantity = resolveQuantity(position.entry, config);
+  const gross = (exitPrice - position.entry) * sign * quantity;
+  const cost = ((position.entry + exitPrice) * quantity * config.costBps) / 10000;
   const pnl = gross - cost;
-  const risk = Math.abs(position.entry - position.sl) * config.quantity;
+  const risk = Math.abs(position.entry - position.sl) * quantity;
 
   return {
     date,
@@ -165,8 +188,10 @@ function buildTrade({ date, orb, position, exitPrice, reason, candle, config, ca
     exitTs: candle.t,
     exit: round(exitPrice),
     reason,
+    quantity,
+    notional: round(position.entry * quantity),
     pnl: round(pnl),
-    pnlPct: round((pnl / (position.entry * config.quantity)) * 100),
+    pnlPct: round((pnl / (position.entry * quantity)) * 100),
     rMultiple: risk > 0 ? round(pnl / risk) : 0,
     // Kept so the report can draw this day's chart on click.
     candles: candles.map((c) => [c.t, c.o, c.h, c.l, c.c]),

@@ -4,14 +4,21 @@ const path = require('path');
 const { loadEnv } = require('./src/env');
 loadEnv();
 
-const config = require('./config');
+const baseConfig = require('./config');
 const { getCandles } = require('./src/fetch');
+const { getLastPrices } = require('./src/quotes');
 const { runBacktest } = require('./src/engine');
 const { computeMetrics } = require('./src/metrics');
 const { writeReport } = require('./src/report');
 const { writeTradeLog } = require('./src/tradeLog');
 
 async function main() {
+  const ltp =
+    baseConfig.sizing === 'ltp'
+      ? (await getLastPrices([baseConfig.symbol])).get(baseConfig.symbol)
+      : undefined;
+  const config = { ...baseConfig, ltp };
+
   const candles = await getCandles(config);
   console.log(`Loaded ${candles.length} candles.`);
 

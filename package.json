@@ -10,7 +10,10 @@
     "start": "node index.js",
     "report": "node index.js && open out/report.html",
     "sweep": "node sweep.js",
-    "all": "node runAll.js"
+    "all": "node runAll.js",
+    "final": "node runAll.js all _final_list.txt",
+    "summary": "node summary.js",
+    "core": "node summary.js all _ORB_BRERAKOUT_CORE.txt"
   },
   "engines": {
     "node": ">=18"

@@ -107,6 +107,7 @@
           <th data-key="exitTime">Exit @</th>
           <th data-key="exit">Exit</th>
           <th data-key="reason">Why</th>
+          <th data-key="quantity">Qty</th>
           <th data-key="pnl">P&amp;L ₹</th>
           <th data-key="pnlPct">P&amp;L %</th>
           <th data-key="rMultiple">R</th>
@@ -140,12 +141,32 @@ document.getElementById('title').textContent = DATA.config.symbol + ' — Openin
 const describeTarget = (c) =>
   c.targetMode === 'none' ? 'no target' : c.targetMode === 'pct' ? `target ${c.targetPct}%` : `target ${c.targetR}R`;
 const describeStop = (c) => (c.slMode === 'range' ? 'SL at range edge' : `SL ${c.slPct}%`);
+// Quantity is per-trade under entry-price sizing, so report what was actually
+// traded — a range when it varied, a single number when it didn't.
+function describeSizing(c) {
+  const qtys = DATA.trades.map((t) => t.quantity ?? c.quantity);
+  if (!qtys.length) return `qty ${c.quantity}`;
+
+  const lo = Math.min(...qtys), hi = Math.max(...qtys);
+  const qty = lo === hi ? `qty ${lo}` : `qty ${lo}–${hi}`;
+
+  if (!c.sizing || c.sizing === 'fixed') return qty;
+
+  // Notional is the value of the shares; margin is what you actually put up for
+  // them. Show both, or 10k of margin against 50k of stock looks like a bug.
+  const avgNotional = Math.round(
+    DATA.trades.reduce((sum, t) => sum + (t.notional ?? 0), 0) / DATA.trades.length
+  );
+  const avgMargin = Math.round(avgNotional / c.leverage);
+  const inr = (n) => '₹' + n.toLocaleString('en-IN');
+  return `${qty} · ~${inr(avgMargin)} margin → ${inr(avgNotional)} stock (${c.leverage}×)`;
+}
 
 document.getElementById('subtitle').textContent =
   `${DATA.config.fromDate} to ${DATA.config.toDate} · ${DATA.config.resolution}-min candles · ` +
   `range ${DATA.config.orbStart}-${DATA.config.orbEnd} · ${DATA.config.direction} · ` +
   `${describeTarget(DATA.config)} · ${describeStop(DATA.config)} · ` +
-  `qty ${DATA.config.quantity} · costs ${DATA.config.costBps} bps`;
+  `${describeSizing(DATA.config)} · costs ${DATA.config.costBps} bps`;
 
 const cards = [
   ['Trades', m.totalTrades, ''],
@@ -277,6 +298,7 @@ function renderTable() {
         <td>${t.entry}</td><td>${t.sl}</td><td>${t.target === null ? '—' : t.target}</td>
         <td>${t.exitTime}</td><td>${t.exit}</td>
         <td><span class="tag ${t.reason}">${t.reason}</span></td>
+        <td>${t.quantity ?? DATA.config.quantity}</td>
         <td class="${cls(t.pnl)}">${money(t.pnl)}</td>
         <td class="${cls(t.pnlPct)}">${money(t.pnlPct)}</td>
         <td class="${cls(t.rMultiple)}">${t.rMultiple}</td>

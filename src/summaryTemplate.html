@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ORB Watchlist Summary</title>
+<style>
+  :root{--bg:#0f1115;--panel:#171a21;--border:#262b36;--text:#e6e9ef;
+        --muted:#8b93a7;--green:#26a69a;--red:#ef5350;--accent:#5b8def;--warn:#f0b429}
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px;background:var(--bg);color:var(--text);
+    font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:8px}
+  .warn{color:var(--warn);font-size:12px;margin-bottom:18px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .card .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .card .value{font-size:22px;font-weight:650;margin-top:6px;font-variant-numeric:tabular-nums}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  input[type=search]{background:var(--bg);color:var(--text);border:1px solid var(--border);
+    border-radius:8px;padding:8px 12px;font-size:13px;min-width:200px}
+  input[type=search]:focus{outline:none;border-color:var(--accent)}
+  .count{color:var(--muted);font-size:12px}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--panel)}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    cursor:pointer;user-select:none;position:sticky;top:0;background:var(--panel);z-index:1}
+  th:first-child{z-index:2}
+  th:hover{color:var(--text)}
+  tbody tr:hover,tbody tr:hover td:first-child{background:#1e222b}
+  .pos{color:var(--green)}.neg{color:var(--red)}
+  .scroll{max-height:68vh;overflow:auto}
+  tfoot td{font-weight:650;border-top:2px solid var(--border);background:var(--panel);position:sticky;bottom:0}
+  .exits{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>Watchlist summary — Opening Range Breakout</h1>
+<div class="sub" id="subtitle"></div>
+<div class="warn" id="warning"></div>
+
+<div class="cards" id="cards"></div>
+
+<div class="panel">
+  <div class="toolbar">
+    <input type="search" id="filter" placeholder="Filter symbol…" />
+    <span class="count" id="count"></span>
+    <span class="count">Click a column to sort.</span>
+  </div>
+  <div class="scroll">
+    <table id="tbl">
+      <thead><tr id="head"></tr></thead>
+      <tbody></tbody>
+      <tfoot><tr id="foot"></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const money = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
+const cls = (n) => (n >= 0 ? 'pos' : 'neg');
+const inr = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+
+const COLS = [
+  {key:'symbol',      label:'Symbol',      fmt:(v)=>v.replace(/^NSE:|-EQ$/g,''), raw:true},
+  {key:'trades',      label:'Trades',      fmt:(v)=>v},
+  {key:'winRate',     label:'Win rate',    fmt:(v)=>v.toFixed(1)+'%'},
+  {key:'totalPnl',    label:'Total P&L',   fmt:money, colour:true},
+  {key:'expectancy',  label:'Exp / trade', fmt:money, colour:true},
+  {key:'profitFactor',label:'Profit factor',fmt:(v)=>v===null?'—':v.toFixed(2),
+    colour:true, colourBy:(v)=>v===null?0:v-1},
+  {key:'avgR',        label:'Avg R',       fmt:(v)=>v.toFixed(2), colour:true},
+  {key:'avgWin',      label:'Avg win',     fmt:money, colour:true},
+  {key:'avgLoss',     label:'Avg loss',    fmt:money, colour:true},
+  {key:'maxDrawdown', label:'Max DD',      fmt:(v)=>'-'+v.toFixed(2), colour:true, colourBy:()=>-1},
+  {key:'bestTrade',   label:'Best trade',  fmt:money, colour:true},
+  {key:'worstTrade',  label:'Worst trade', fmt:money, colour:true},
+  {key:'qtyRange',    label:'Qty',         fmt:(v)=>v, raw:true},
+  {key:'avgNotional', label:'Avg stock',   fmt:(v)=>inr(v), raw:true},
+  {key:'exits',       label:'Exits',       fmt:(v)=>v, raw:true},
+];
+
+const c = DATA.config;
+document.getElementById('subtitle').textContent =
+  `${DATA.rows.length} symbols · ${c.fromDate} to ${c.toDate} · ${c.resolution}-min candles · ` +
+  `range ${c.orbStart}-${c.orbEnd} · exit by ${c.sessionEnd} · ${c.direction} · ` +
+  `target ${c.targetMode === 'pct' ? c.targetPct + '%' : c.targetMode} · SL ${c.slMode} ${c.slPct}% · ` +
+  `${inr(c.capitalPerTrade)} margin × ${c.leverage}`;
+
+document.getElementById('warning').textContent =
+  c.costBps === 0
+    ? 'costBps is 0 — these figures include no brokerage, taxes or slippage. Real costs have run 40-60% of gross on this strategy.'
+    : `costs ${c.costBps} bps applied on both legs.`;
+
+const t = DATA.totals;
+document.getElementById('cards').innerHTML = [
+  ['Symbols', DATA.rows.length, ''],
+  ['Total trades', t.trades, ''],
+  ['Win rate', t.winRate.toFixed(1)+'%', ''],
+  ['Total P&L', money(t.totalPnl), cls(t.totalPnl)],
+  ['Expectancy / trade', money(t.expectancy), cls(t.expectancy)],
+  ['Profit factor', t.profitFactor===null?'—':t.profitFactor.toFixed(2), t.profitFactor>=1?'pos':'neg'],
+  ['Profitable symbols', `${t.winners} / ${DATA.rows.length}`, t.winners*2>=DATA.rows.length?'pos':'neg'],
+  ['Median symbol P&L', money(t.medianPnl), cls(t.medianPnl)],
+  ['Top symbol share', t.topShare.toFixed(0)+'%', t.topShare>40?'neg':''],
+  ['Best symbol', t.bestSymbol, 'pos'],
+  ['Worst symbol', t.worstSymbol, 'neg'],
+].map(([l,v,k])=>`<div class="card"><div class="label">${l}</div><div class="value ${k}">${v}</div></div>`).join('');
+
+document.getElementById('head').innerHTML = COLS.map((col,i)=>`<th data-i="${i}">${col.label}</th>`).join('');
+
+let sortKey = 'totalPnl', sortAsc = false, filter = '';
+
+function render() {
+  const rows = DATA.rows
+    .filter(r => r.symbol.toLowerCase().includes(filter))
+    .sort((a,b)=>{
+      const x=a[sortKey], y=b[sortKey];
+      const cmp = typeof x === 'number' ? x-y : String(x).localeCompare(String(y));
+      return sortAsc ? cmp : -cmp;
+    });
+
+  document.querySelector('#tbl tbody').innerHTML = rows.map(r=>'<tr>'+COLS.map(col=>{
+    const v = r[col.key];
+    if (col.raw) return `<td class="${col.key==='exits'?'exits':''}">${col.fmt(v)}</td>`;
+    const colourVal = col.colourBy ? col.colourBy(v) : v;
+    return `<td class="${col.colour?cls(colourVal):''}">${v===null?'—':col.fmt(v)}</td>`;
+  }).join('')+'</tr>').join('');
+
+  document.getElementById('count').textContent = `${rows.length} shown`;
+
+  const sum = (k)=>rows.reduce((p,r)=>p+(r[k]||0),0);
+  document.getElementById('foot').innerHTML =
+    `<td>TOTAL (${rows.length})</td><td>${sum('trades')}</td><td></td>` +
+    `<td class="${cls(sum('totalPnl'))}">${money(sum('totalPnl'))}</td>` +
+    `<td></td><td></td><td></td><td></td><td></td>` +
+    `<td class="neg">-${sum('maxDrawdown').toFixed(2)}</td>` +
+    `<td></td><td></td><td></td><td></td><td></td>`;
+}
+
+for (const th of document.querySelectorAll('#head th')) {
+  th.onclick = () => {
+    const key = COLS[+th.dataset.i].key;
+    sortAsc = key === sortKey ? !sortAsc : false;
+    sortKey = key;
+    render();
+  };
+}
+document.getElementById('filter').oninput = (e) => { filter = e.target.value.toLowerCase(); render(); };
+
+render();
+</script>
+</body>
+</html>
