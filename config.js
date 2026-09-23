@@ -2,9 +2,9 @@
 
 module.exports = {
   // --- What to backtest ---
-  symbol: "NSE:PAGEIND-EQ",
+  symbol: "NSE:ABREL-EQ",
   fromDate: "2020-01-01",
-  toDate: "2026-09-18",
+  toDate: "2026-09-22",
 
   // Blocks runAll.js so only `symbol` above is ever tested. Keep this true while
   // validating the strategy on one name; flip it to false to open up _F&O.txt.
@@ -25,7 +25,7 @@ module.exports = {
   //                   applying it to months-old trades misstates them.
   //   'fixed'      -> plain `quantity` shares, ignoring price.
   sizing: "entryPrice",
-  capitalPerTrade: 200000, // rupees of margin per trade
+  capitalPerTrade: 10000, // rupees of margin per trade
   leverage: 5, // broker margin multiple, so 10k controls 50k of stock
   quantity: 1, // only used when sizing is 'fixed'
 
@@ -47,7 +47,7 @@ module.exports = {
   // Run `npm run sweep` to compare these on your own data.
   targetMode: "pct",
   targetR: 1, // only used when targetMode is 'R'
-  targetPct: 2,
+  targetPct: 1.5,
 
   // Opening range window. orbEnd is exclusive, so 09:15-09:29 = first 15 one-min candles.
   orbStart: "09:15",
