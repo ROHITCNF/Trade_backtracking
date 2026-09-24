@@ -15,7 +15,8 @@
     "summary": "node summary.js",
     "core": "node summary.js all _ORB_BRERAKOUT_CORE.txt",
     "login": "node server/login.js",
-    "live": "node server/live.js"
+    "live": "node server/live.js",
+    "today": "node server/today.js"
   },
   "engines": {
     "node": ">=18"
