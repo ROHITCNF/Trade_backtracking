@@ -13,9 +13,14 @@
     "all": "node runAll.js",
     "final": "node runAll.js all _final_list.txt",
     "summary": "node summary.js",
-    "core": "node summary.js all _ORB_BRERAKOUT_CORE.txt"
+    "core": "node summary.js all _ORB_BRERAKOUT_CORE.txt",
+    "login": "node server/login.js",
+    "live": "node server/live.js"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "fyers-api-v3": "^2.3.0"
   }
 }

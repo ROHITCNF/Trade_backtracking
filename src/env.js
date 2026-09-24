@@ -4,8 +4,8 @@
 const fs = require('fs');
 const path = require('path');
 
-function loadEnv() {
-  const file = path.join(__dirname, '..', '.env');
+// Defaults to the project-root .env; the live runner passes server/.env.
+function loadEnv(file = path.join(__dirname, '..', '.env')) {
   if (!fs.existsSync(file)) return;
 
   for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
