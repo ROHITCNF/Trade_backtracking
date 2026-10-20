@@ -18,7 +18,7 @@ npm run today                # print today's live decision log
 
 `runAll.js` and `summary.js` demand an explicit count (`5`, `all`) and take an optional list name
 from `lists/`. There is no bare invocation, because `fno.txt` is 207 symbols — about 1,400 API
-calls for a year of 1-minute data.
+calls (~30 minutes at 50/min) for a year of 1-minute data.
 
 `runAll.js` writes one page per ticker (`out/NSE_RVNL_EQ.html`) as each finishes, then writes
 `out/tickers.js`, which those pages load for their dropdown, so the dropdown only ever names pages
@@ -33,8 +33,10 @@ pure function, so exercise it by requiring `src/engine.js` and feeding it synthe
 
 1. `src/fetch.js` — pulls candles from Fyers' history API via the SDK, 60 days per request. **No
    cache**: every run fetches fresh, so every run needs today's token. All REST goes through
-   `rest()` in `src/fyers.js`, which spaces calls ≥350 ms apart to stay under the 200/min cap
-   (three breaches in a day block the account, live runner included).
+   `rest()` in `src/fyers.js`, which spaces calls ≥1.3 s apart to stay under the Standard plan's
+   Data API cap of 50/min (three breaches in a day block the account, live runner included) and
+   stops at 4,800 of the 5,000/day. Clock and count live in `data/rest-usage.json`, shared across
+   processes; after any 429 every process refuses REST for the rest of the day.
 2. `src/engine.js` — pure backtest. Candles + config in, trades out. No network, no disk.
 3. `src/metrics.js` — trades in, summary stats + equity curve out.
 4. `src/tradeLog.js` — dumps the run to `data/trades/<SYMBOL>.json` and `.csv`.

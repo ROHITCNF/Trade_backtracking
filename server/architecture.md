@@ -86,18 +86,19 @@ only then starts the feed.
 ## Rate limits — the one that ends the day
 
 ```
-10/sec · 200/min · 100,000/day
+Data APIs (history): 5/sec · 50/min · 5,000/day   (Standard plan)
 breaching the per-minute cap 3 times in one day blocks the account until tomorrow
 ```
 
 Never poll `getQuotes`. Live prices come from the websocket only. REST is used for warm
 start and reconnect backfill, nothing else. That is 39 calls at launch, spaced, and the
-data socket allows 5,000 symbols per connection so all 39 share one.
+Standard data socket allows 100 symbols so all 39 share one.
 
-Every REST call goes through `rest()` in `src/fyers.js`, which spaces calls ≥350 ms apart
-(≤171/min). That throttle is **per process**, and backtests use the same app and token:
-don't run a large backtest (`runAll.js`, `summary.js`) while the live runner is starting
-up or backfilling, or the two together can breach 200/min.
+Every REST call goes through `rest()` in `src/fyers.js`, which spaces calls ≥1.3 s apart
+(≤46/min) and stops at 4,800/day. The clock and count live in `data/rest-usage.json` behind a
+lock, so the live runner and a backtest share one budget. Warm start's 39 calls take ~50 s,
+and a large backtest running alongside slows it further. After any 429, every process
+refuses REST for the day — delete the file to resume once the window has reset.
 
 ## Auth
 
