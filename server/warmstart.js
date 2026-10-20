@@ -2,10 +2,7 @@
 // from the moment it connects) and after any reconnect.
 
 const { getCandles } = require('../src/fetch');
-
-function istToday() {
-  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
-}
+const { istToday } = require('../src/time');
 
 // Sequential: src/fyers.js spaces the calls so 39 symbols stay well under the
 // per-minute cap, whose breach three times blocks the account for the day.
@@ -20,4 +17,4 @@ async function warmStart(symbols, onSymbol) {
   }
 }
 
-module.exports = { warmStart, istToday };
+module.exports = { warmStart };

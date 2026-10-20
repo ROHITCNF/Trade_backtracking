@@ -7,14 +7,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const { istToday } = require('../src/time');
+const { round, shortSymbol: short } = require('../src/util');
 
 const DIR = path.join(__dirname, '..', 'data', 'live');
-const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
 const money = (n) => (n >= 0 ? '+' : '') + n.toFixed(2);
-
-function istToday() {
-  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
-}
 
 function main() {
   const date = process.argv[2] || istToday();
@@ -57,7 +54,7 @@ function main() {
       'exit @': exit ? exit.time : '—',
       exit: exit ? exit.price : '—',
       why: exit ? exit.reason : 'OPEN',
-      pnl: exit ? Math.round(exit.pnl * 100) / 100 : null,
+      pnl: exit ? round(exit.pnl) : null,
     });
   }
 

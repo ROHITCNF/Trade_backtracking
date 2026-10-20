@@ -10,10 +10,11 @@ require('../src/env').loadEnv();
 const baseConfig = require('../config');
 const { readTickers } = require('../src/tickers');
 const { runBacktest } = require('../src/engine');
-const { toMinutes, istParts } = require('../src/time');
+const { toMinutes, istParts, istToday } = require('../src/time');
+const { shortSymbol } = require('../src/util');
 const { client, socketToken } = require('../src/fyers');
 const { CandleBuilder } = require('./candles');
-const { warmStart, istToday } = require('./warmstart');
+const { warmStart } = require('./warmstart');
 const { startFeed } = require('./feed');
 const { createPaperBroker } = require('./broker/paper');
 const state = require('./state');
@@ -30,6 +31,9 @@ function desiredState(trade, lastMinute, sessionEndMin) {
   return { position: 'CLOSED', trade };
 }
 
+const entryOf = (t) => ({ side: t.side, price: t.entry, quantity: t.quantity, sl: t.sl, target: t.target, time: t.entryTime });
+const exitOf = (t) => ({ side: t.side, price: t.exit, quantity: t.quantity, reason: t.reason, pnl: t.pnl, time: t.exitTime });
+
 async function main() {
   const date = istToday();
   const symbols = readTickers(LIST);
@@ -44,7 +48,7 @@ async function main() {
   const broker = createPaperBroker({
     onEvent: (e) => {
       console.log(
-        `${e.time}  ${e.kind.padEnd(5)} ${e.symbol.replace(/^NSE:|-EQ$/g, '').padEnd(12)}` +
+        `${e.time}  ${e.kind.padEnd(5)} ${shortSymbol(e.symbol).padEnd(12)}` +
           ` ${e.side ?? ''} ${e.price} x${e.quantity}` +
           (e.reason ? `  ${e.reason} pnl ${e.pnl.toFixed(2)}` : `  sl ${e.sl} tgt ${e.target ?? '-'}`)
       );
@@ -57,9 +61,8 @@ async function main() {
     `range ${baseConfig.orbStart}-${baseConfig.orbEnd} · exit ${baseConfig.sessionEnd}`);
   console.log('\nWarm start: pulling today\'s candles...');
 
-  await warmStart(symbols, (symbol, candles) => {
-    books.get(symbol).setCompleted(candles);
-  });
+  const backfill = () => warmStart(symbols, (symbol, candles) => books.get(symbol).setCompleted(candles));
+  await backfill();
 
   const filled = [...books.values()].filter((b) => b.completed.length > 0).length;
   console.log(`Warm start done — ${filled}/${symbols.length} symbols have candles.\n`);
@@ -74,38 +77,23 @@ async function main() {
     const want = desiredState(trade, book.lastMinute(), sessionEndMin);
     const have = status.get(symbol);
 
+    let next = have;
     if (want.position === 'OPEN' && have === 'FLAT') {
-      status.set(symbol, 'OPEN');
-      broker.enter(symbol, {
-        side: want.trade.side, price: want.trade.entry, quantity: want.trade.quantity,
-        sl: want.trade.sl, target: want.trade.target, time: want.trade.entryTime,
-      });
-    } else if (want.position === 'CLOSED' && have === 'OPEN') {
-      status.set(symbol, 'CLOSED');
-      broker.exit(symbol, {
-        side: want.trade.side, price: want.trade.exit, quantity: want.trade.quantity,
-        reason: want.trade.reason, pnl: want.trade.pnl, time: want.trade.exitTime,
-      });
-    } else if (want.position === 'CLOSED' && have === 'FLAT' && want.trade) {
-      // Entry and exit landed inside the same evaluation — record both so the
-      // day's log still reconciles against the backtest.
-      status.set(symbol, 'CLOSED');
-      broker.enter(symbol, {
-        side: want.trade.side, price: want.trade.entry, quantity: want.trade.quantity,
-        sl: want.trade.sl, target: want.trade.target, time: want.trade.entryTime,
-      });
-      broker.exit(symbol, {
-        side: want.trade.side, price: want.trade.exit, quantity: want.trade.quantity,
-        reason: want.trade.reason, pnl: want.trade.pnl, time: want.trade.exitTime,
-      });
+      broker.enter(symbol, entryOf(want.trade));
+      next = 'OPEN';
+    } else if (want.position === 'CLOSED' && have !== 'CLOSED') {
+      // From FLAT, entry and exit landed inside the same evaluation — record both
+      // so the day's log still reconciles against the backtest.
+      if (have === 'FLAT') broker.enter(symbol, entryOf(want.trade));
+      broker.exit(symbol, exitOf(want.trade));
+      next = 'CLOSED';
     }
 
-    // Persist immediately on a change, not on a timer. A restart must never
-    // re-emit a position it already took — the 10s snapshot below is only a
-    // backstop for the case where nothing changed.
-    const now = status.get(symbol);
-    if (saved.symbols[symbol]?.position !== now) {
-      saved.symbols[symbol] = { position: now };
+    // Persist immediately on a change. A restart must never re-emit a position
+    // it already took.
+    if (next !== have) {
+      status.set(symbol, next);
+      saved.symbols[symbol] = { position: next };
       state.save(saved);
     }
   }
@@ -117,10 +105,19 @@ async function main() {
     `${[...status.values()].filter((s) => s === 'OPEN').length}, ` +
     `closed today: ${[...status.values()].filter((s) => s === 'CLOSED').length}.\n`);
 
+  let connects = 0;
   startFeed({
     token: socketToken(),
     symbols,
-    onOpen: () => console.log('Feed connected. Watching.\n'),
+    onOpen: async () => {
+      if (++connects === 1) return console.log('Feed connected. Watching.\n');
+      // Ticks missed while disconnected never arrive, so refill today's
+      // completed candles from REST before trusting the books again.
+      console.log('Feed reconnected — backfilling missed candles...');
+      await backfill();
+      for (const symbol of symbols) evaluate(symbol);
+      console.log('Backfill done. Watching.\n');
+    },
     onClose: () => console.log('Feed closed.'),
     onError: (e) => console.log('Feed error:', e?.message ?? e),
     onTick: (symbol, ltp, ts) => {
@@ -135,9 +132,6 @@ async function main() {
       if (book.addTick(ltp, ts)) evaluate(symbol);
     },
   });
-
-  // Snapshot on a timer rather than per tick, so a crash costs at most 10s.
-  setInterval(() => state.save(saved), 10000);
 
   const stop = () => { state.save(saved); console.log('\nStopped. State saved.'); process.exit(0); };
   process.on('SIGINT', stop);

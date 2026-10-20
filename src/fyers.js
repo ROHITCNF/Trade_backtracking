@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fyersModel } = require('fyers-api-v3');
+const { istToday } = require('./time');
 
 const TOKEN_FILE = path.join(__dirname, '..', 'data', 'token.json');
 
@@ -29,18 +30,13 @@ function newClient() {
 function readToken() {
   if (!fs.existsSync(TOKEN_FILE)) return null;
   const saved = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf8'));
-  // Tokens expire end of day, so one saved yesterday is already dead.
-  return saved.date === today() ? saved.access_token : null;
+  // Tokens expire end of day (IST), so one saved yesterday is already dead.
+  return saved.date === istToday() ? saved.access_token : null;
 }
 
 function saveToken(access_token) {
   fs.mkdirSync(path.dirname(TOKEN_FILE), { recursive: true });
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ date: today(), access_token }, null, 2));
-}
-
-function today() {
-  // IST date, so the token expires on the market's calendar rather than UTC's.
-  return new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+  fs.writeFileSync(TOKEN_FILE, JSON.stringify({ date: istToday(), access_token }, null, 2));
 }
 
 function accessToken() {
@@ -78,4 +74,4 @@ function rest(fn) {
   return run;
 }
 
-module.exports = { newClient, client, socketToken, readToken, saveToken, today, rest };
+module.exports = { newClient, client, socketToken, readToken, saveToken, rest };

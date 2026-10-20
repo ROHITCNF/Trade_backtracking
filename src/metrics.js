@@ -1,6 +1,6 @@
 // Turns a list of trades into the numbers you actually judge the strategy by.
 
-const round = (n) => Math.round(n * 100) / 100;
+const { round } = require('./util');
 const sum = (nums) => nums.reduce((a, b) => a + b, 0);
 const avg = (nums) => (nums.length ? sum(nums) / nums.length : 0);
 

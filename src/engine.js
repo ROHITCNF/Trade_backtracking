@@ -2,8 +2,7 @@
 // Give it candles + config, it gives back one trade per day (or none).
 
 const { toMinutes, istParts } = require('./time');
-
-const round = (n) => Math.round(n * 100) / 100;
+const { round } = require('./util');
 
 // [[ts,o,h,l,c,v], ...] -> Map<'2025-01-02', [{t,o,h,l,c,minute,time}, ...]>
 function groupByDay(rawCandles) {

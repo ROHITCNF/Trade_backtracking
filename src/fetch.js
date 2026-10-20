@@ -25,6 +25,8 @@ async function fetchChunk(symbol, resolution, from, to) {
     throw new Error(`Fyers history failed for ${symbol}: ${JSON.stringify(err).slice(0, 300)}`);
   }
 
+  // 'no_data' is a range with no sessions in it (weekend, holiday, pre-open).
+  if (res.s === 'no_data') return [];
   if (res.s !== 'ok' || !Array.isArray(res.candles)) {
     throw new Error(`Fyers history failed for ${symbol}: ${JSON.stringify(res).slice(0, 300)}`);
   }
