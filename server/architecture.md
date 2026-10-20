@@ -55,7 +55,7 @@ That table is the whole translation layer. No engine changes were needed for it.
 
 | file | job |
 |---|---|
-| `auth.js` | OAuth two-step, caches the token in `data/live/token.json` |
+| `../src/fyers.js` | OAuth client + REST throttle, caches the token in `data/token.json` |
 | `callback.js` | localhost server that catches the redirect and grabs `auth_code` |
 | `login.js` | CLI that runs the login once a day |
 | `candles.js` | ticks → IST-aligned 1-minute candles |

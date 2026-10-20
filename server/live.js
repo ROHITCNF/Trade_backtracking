@@ -5,13 +5,13 @@
 //
 // See server/architecture.md for why it is shaped this way.
 
-require('../src/env').loadEnv(require('path').join(__dirname, '.env'));
+require('../src/env').loadEnv();
 
 const baseConfig = require('../config');
 const { readTickers } = require('../src/tickers');
 const { runBacktest } = require('../src/engine');
 const { toMinutes, istParts } = require('../src/time');
-const { client, socketToken } = require('./auth');
+const { client, socketToken } = require('../src/fyers');
 const { CandleBuilder } = require('./candles');
 const { warmStart, istToday } = require('./warmstart');
 const { startFeed } = require('./feed');
@@ -35,7 +35,7 @@ async function main() {
   const symbols = readTickers(LIST);
   const sessionEndMin = toMinutes(baseConfig.sessionEnd);
 
-  const fyers = client();
+  client(); // fail fast if there is no token for today
   const saved = state.load(date);
 
   const books = new Map(symbols.map((s) => [s, new CandleBuilder()]));
@@ -57,7 +57,7 @@ async function main() {
     `range ${baseConfig.orbStart}-${baseConfig.orbEnd} · exit ${baseConfig.sessionEnd}`);
   console.log('\nWarm start: pulling today\'s candles...');
 
-  await warmStart(fyers, symbols, (symbol, candles) => {
+  await warmStart(symbols, (symbol, candles) => {
     books.get(symbol).setCompleted(candles);
   });
 
