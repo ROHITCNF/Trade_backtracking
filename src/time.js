@@ -26,4 +26,9 @@ function dateToEpoch(dateStr) {
   return Date.parse(`${dateStr}T00:00:00Z`) / 1000 - IST_OFFSET_SECONDS;
 }
 
-module.exports = { IST_OFFSET_SECONDS, toMinutes, istParts, dateToEpoch };
+// Today's date in IST, '2025-01-02'
+function istToday() {
+  return istParts(Math.floor(Date.now() / 1000)).date;
+}
+
+module.exports = { IST_OFFSET_SECONDS, toMinutes, istParts, dateToEpoch, istToday };

@@ -17,8 +17,7 @@ const baseConfig = require('./config');
 const { computeMetrics } = require('./src/metrics');
 const { runList, parseCountAndList, printSkipped } = require('./src/run');
 const { renderTemplate } = require('./src/report');
-
-const round = (n) => Math.round(n * 100) / 100;
+const { round, shortSymbol: short } = require('./src/util');
 
 const USAGE =
   'Pass how many symbols to run:\n' +
@@ -58,7 +57,6 @@ function totalsFrom(allTrades, rows) {
   const sorted = rows.map((r) => r.totalPnl).sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
 
   return {
     trades: m.totalTrades,
