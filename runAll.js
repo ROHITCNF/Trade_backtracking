@@ -21,13 +21,12 @@ const { runBacktest } = require('./src/engine');
 const { computeMetrics } = require('./src/metrics');
 const { writeReport } = require('./src/report');
 const { writeTradeLog } = require('./src/tradeLog');
-const { getLastPrices } = require('./src/quotes');
 
 const FETCH_DELAY_MS = 150;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function backtestOne(symbol, ltp) {
-  const config = { ...baseConfig, symbol, ltp };
+async function backtestOne(symbol) {
+  const config = { ...baseConfig, symbol };
   const candles = await getCandles(config);
   const trades = runBacktest(candles, config);
   return { config, trades, metrics: computeMetrics(trades) };
@@ -65,10 +64,6 @@ async function main() {
   const symbols = readTickers(listFile).slice(0, limit);
   console.log(`\n${symbols.length} tickers from ${listFile} · ${baseConfig.fromDate} -> ${baseConfig.toDate}\n`);
 
-  // One quotes call up front rather than one per symbol.
-  const prices = baseConfig.sizing === 'ltp' ? await getLastPrices(symbols) : new Map();
-  if (prices.size) console.log(`Fetched ${prices.size} live prices for sizing.\n`);
-
   // Pass 1: fetch and backtest to find out which symbols actually have usable data.
   const ok = [];
   const failed = [];
@@ -76,7 +71,7 @@ async function main() {
   for (const [i, symbol] of symbols.entries()) {
     const tag = `[${i + 1}/${symbols.length}] ${symbol}`;
     try {
-      const { metrics } = await backtestOne(symbol, prices.get(symbol));
+      const { metrics } = await backtestOne(symbol);
       if (metrics.totalTrades === 0) {
         failed.push({ symbol, reason: 'no trades' });
         console.log(`${tag} — no trades, skipped`);
@@ -99,7 +94,7 @@ async function main() {
 
   console.log(`\nWriting ${tickers.length} pages...`);
   for (const { symbol, file } of tickers) {
-    const { config, trades, metrics } = await backtestOne(symbol, prices.get(symbol));
+    const { config, trades, metrics } = await backtestOne(symbol);
     writeTradeLog(trades, metrics, config);
     writeReport(trades, metrics, config, { tickers, fileName: file });
   }

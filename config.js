@@ -20,9 +20,6 @@ module.exports = {
   //   'entryPrice' -> capitalPerTrade of margin at `leverage`, priced off each
   //                   trade's own entry. Every trade risks a comparable rupee
   //                   amount, so one expensive stock can't dominate the totals.
-  //   'ltp'        -> same maths, but priced off today's last traded price from
-  //                   the quotes API. This is the size you would place right now;
-  //                   applying it to months-old trades misstates them.
   //   'fixed'      -> plain `quantity` shares, ignoring price.
   sizing: "entryPrice",
   capitalPerTrade: 10000, // rupees of margin per trade
