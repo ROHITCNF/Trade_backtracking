@@ -1,9 +1,9 @@
 // Backtests a watchlist and writes one report page per ticker, each carrying a
 // dropdown that navigates to the others.
 //
-//   node runAll.js 5                      first 5 of _F&O.txt
-//   node runAll.js all                    all of _F&O.txt
-//   node runAll.js all _final_list.txt    a different list  (npm run final)
+//   node runAll.js 5                      first 5 of fno.txt
+//   node runAll.js all                    all of fno.txt
+//   node runAll.js all final.txt          a different list  (npm run final)
 //
 // Pages are written as each symbol finishes; the dropdown list is written last
 // to out/tickers.js, which every page loads, so it only ever names pages that exist.
@@ -21,9 +21,9 @@ const { writeTradeLog } = require('./src/tradeLog');
 
 const USAGE =
   'Pass how many tickers to run:\n' +
-  '  node runAll.js 5                     first 5 of _F&O.txt\n' +
-  '  node runAll.js all                   all of _F&O.txt (~1,400 API calls for a year, ~8 min)\n' +
-  '  node runAll.js all _final_list.txt   a different list  (npm run final)\n\n' +
+  '  node runAll.js 5                     first 5 of fno.txt\n' +
+  '  node runAll.js all                   all of fno.txt (~1,400 API calls for a year, ~8 min)\n' +
+  '  node runAll.js all final.txt         a different list  (npm run final)\n\n' +
   'For a single ticker use `npm start`, which reads config.symbol.';
 
 async function main() {

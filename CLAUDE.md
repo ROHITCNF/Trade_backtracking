@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm start          # one ticker (config.symbol) -> out/report.html
 npm run report     # same, then open it
 npm run sweep      # compare every profit-target rule on the same candles
-node runAll.js 5   # first 5 tickers from _F&O.txt
+node runAll.js 5   # first 5 tickers from fno.txt
 node runAll.js all # the whole watchlist
 ```
 

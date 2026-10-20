@@ -2,8 +2,8 @@
 // per symbol, plus aggregates across all of them. No per-ticker pages, no day
 // charts — use runAll.js when you want to inspect individual trades.
 //
-//   node summary.js all _ORB_BRERAKOUT_CORE.txt    (npm run core)
-//   node summary.js 10 _final_list.txt
+//   node summary.js all core.txt   (npm run core)
+//   node summary.js 10 final.txt
 //
 // Candles are stripped from the payload, so the page stays small no matter how
 // many symbols you run.
@@ -21,8 +21,8 @@ const { round, shortSymbol: short } = require('./src/util');
 
 const USAGE =
   'Pass how many symbols to run:\n' +
-  '  node summary.js all _ORB_BRERAKOUT_CORE.txt\n' +
-  '  node summary.js 10 _final_list.txt';
+  '  node summary.js all core.txt\n' +
+  '  node summary.js 10 final.txt';
 
 function rowFor(symbol, trades, metrics) {
   const qtys = trades.map((t) => t.quantity);

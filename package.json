@@ -11,9 +11,9 @@
     "report": "node index.js && open out/report.html",
     "sweep": "node sweep.js",
     "all": "node runAll.js",
-    "final": "node runAll.js all _final_list.txt",
+    "final": "node runAll.js all final.txt",
     "summary": "node summary.js",
-    "core": "node summary.js all _ORB_BRERAKOUT_CORE.txt",
+    "core": "node summary.js all core.txt",
     "login": "node server/login.js",
     "live": "node server/live.js",
     "today": "node server/today.js"
