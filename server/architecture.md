@@ -56,8 +56,7 @@ That table is the whole translation layer. No engine changes were needed for it.
 | file | job |
 |---|---|
 | `../src/fyers.js` | OAuth client + REST throttle, caches the token in `data/token.json` |
-| `callback.js` | localhost server that catches the redirect and grabs `auth_code` |
-| `login.js` | CLI that runs the login once a day |
+| `login.js` | daily OAuth login; catches the redirect on localhost to grab `auth_code` |
 | `candles.js` | ticks → IST-aligned 1-minute candles |
 | `warmstart.js` | REST backfill of today's candles, on launch and after a reconnect |
 | `feed.js` | `fyersDataSocket` wrapper, auto-reconnect |
@@ -81,7 +80,7 @@ ticks change neither. This is a large saving over 39 symbols and it is determini
 a tick that cannot change the outcome cannot trigger a decision.
 
 **State is on disk.** A dropped socket or a laptop sleeping must not produce a second
-entry on a symbol already held. `live.js` restores from `data/live/state.json` first and
+entry on a symbol already held. `live.js` restores from `data/live/state-<date>.json` first and
 only then starts the feed.
 
 ## Rate limits — the one that ends the day
@@ -94,6 +93,11 @@ breaching the per-minute cap 3 times in one day blocks the account until tomorro
 Never poll `getQuotes`. Live prices come from the websocket only. REST is used for warm
 start and reconnect backfill, nothing else. That is 39 calls at launch, spaced, and the
 data socket allows 5,000 symbols per connection so all 39 share one.
+
+Every REST call goes through `rest()` in `src/fyers.js`, which spaces calls ≥350 ms apart
+(≤171/min). That throttle is **per process**, and backtests use the same app and token:
+don't run a large backtest (`runAll.js`, `summary.js`) while the live runner is starting
+up or backfilling, or the two together can breach 200/min.
 
 ## Auth
 

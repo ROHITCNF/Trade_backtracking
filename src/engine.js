@@ -68,8 +68,8 @@ function computeStop(side, entry, orb, config) {
   }
 }
 
-// Target is measured off risk (the stop distance), not off a fixed percentage,
-// so it widens on volatile days and tightens on quiet ones. See config.targetMode.
+// Target per config.targetMode: a multiple of the stop distance ('R'), a percent
+// of entry ('pct'), or none at all (null).
 function computeTarget(side, entry, sl, config) {
   if (config.targetMode === 'none') return null;
 

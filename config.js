@@ -32,8 +32,8 @@ module.exports = {
   slPct: 1,
 
   // How the profit target is set:
-  //   'R'    -> targetR x risk, where risk = orbHigh - orbLow (the stop distance).
-  //             targetR: 1 projects the full opening range from the breakout.
+  //   'R'    -> targetR x risk, where risk = |entry - sl| as placed by slMode.
+  //             With slMode 'range', targetR: 1 projects the opening range.
   //   'pct'  -> targetPct % of entry price. Ignores range width, so it does not
   //             adapt to volatility — kept only for comparison.
   //   'none' -> no target at all. Exit on stop or at sessionEnd.

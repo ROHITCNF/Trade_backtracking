@@ -1,4 +1,4 @@
-// Minimal .env loader so there are no npm dependencies.
+// Minimal .env loader, so dotenv isn't needed.
 
 const fs = require('fs');
 const path = require('path');
