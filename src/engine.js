@@ -105,20 +105,13 @@ function checkExit(candle, position) {
 //
 //   'fixed'      -> config.quantity, unchanged
 //   'entryPrice' -> priced off each trade's own entry, so a January trade is
-//                   sized with January's price. Correct for a backtest.
-//   'ltp'        -> priced off today's last traded price, which is how you would
-//                   size the trade if you placed it now. Applying today's price
-//                   to months-old trades distorts them, badly for anything that
-//                   has re-rated — useful for planning live size, not for judging
-//                   historical performance.
+//                   sized with January's price.
 function resolveQuantity(entry, config) {
   if (config.sizing === 'fixed' || !config.sizing) return config.quantity;
-
-  const price = config.sizing === 'ltp' ? config.ltp : entry;
-  if (!price) throw new Error(`sizing '${config.sizing}' needs a price for ${config.symbol}`);
+  if (config.sizing !== 'entryPrice') throw new Error(`Unknown sizing: "${config.sizing}"`);
 
   // Never round down to zero — a stock priced above the whole notional gets 1.
-  return Math.max(1, Math.floor((config.capitalPerTrade * config.leverage) / price));
+  return Math.max(1, Math.floor((config.capitalPerTrade * config.leverage) / entry));
 }
 
 function simulateDay(date, candles, config) {

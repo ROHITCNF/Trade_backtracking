@@ -18,7 +18,6 @@ const { readTickers, DEFAULT_LIST } = require('./src/tickers');
 const { getCandles } = require('./src/fetch');
 const { runBacktest } = require('./src/engine');
 const { computeMetrics } = require('./src/metrics');
-const { getLastPrices } = require('./src/quotes');
 
 const OUT = path.join(__dirname, 'out', 'summary.html');
 const FETCH_DELAY_MS = 150;
@@ -99,8 +98,6 @@ async function main() {
 
   console.log(`\n${symbols.length} symbols from ${listFile} · ${baseConfig.fromDate} -> ${baseConfig.toDate}\n`);
 
-  const prices = baseConfig.sizing === 'ltp' ? await getLastPrices(symbols) : new Map();
-
   const rows = [];
   const allTrades = [];
   const skipped = [];
@@ -108,7 +105,7 @@ async function main() {
   for (const [i, symbol] of symbols.entries()) {
     const tag = `[${i + 1}/${symbols.length}] ${symbol}`;
     try {
-      const config = { ...baseConfig, symbol, ltp: prices.get(symbol) };
+      const config = { ...baseConfig, symbol };
       const trades = runBacktest(await getCandles(config), config);
       if (trades.length === 0) {
         skipped.push(`${symbol} (no trades)`);
