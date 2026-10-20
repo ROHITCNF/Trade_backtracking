@@ -3,8 +3,8 @@
 module.exports = {
   // --- What to backtest ---
   symbol: "NSE:ABREL-EQ",
-  fromDate: "2020-01-01",
-  toDate: "2026-09-22",
+  fromDate: "2026-09-29",
+  toDate: "2026-10-19",
 
   // Blocks runAll.js so only `symbol` above is ever tested. Keep this true while
   // validating the strategy on one name; flip it to false to open up _F&O.txt.

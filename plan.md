@@ -79,7 +79,42 @@ Tried and rejected — do not spend time here again:
 Tightening toward "cleaner" setups made it worse, which is the signature of filtering
 noise rather than finding quality.
 
-### The finding that changes things
+### CORRECTION — the finding below was an artifact
+
+**Read this before the section that follows.** Everything above and below was computed with
+the 20 EMA **reset daily**. TradingView does not reset it — the screenshot reads
+`VWAP hlc3 Session` (resets) but `EMA 20 close` (continuous across sessions). So the
+indicator tested was not the indicator the trader is looking at.
+
+Re-run with a continuous EMA and the conclusions invert:
+
+```
+                         daily-reset EMA     continuous EMA (correct)
+CROSS, no gap                  +0.01                +0.10
+CROSS, gap>=0.10%              +0.21                -0.01
+CROSS, gap>=0.20%              +0.20                -0.19
+PULLBACK, no gap               +0.03                +0.13
+PULLBACK, gap>=0.20%           +0.07                +0.06
+STATE at 10:00, gap>=0.10%       n/a                -0.09
+```
+
+With the correct indicator:
+
+- **The gap filter does not work.** Filtering harder makes it worse (-0.01, -0.19, -0.15).
+  The +0.21 was measuring how far price had run since the open, not regime strength,
+  because a daily-reset EMA is meaningless for its first ~20 bars.
+- **The pullback does add value** — +0.13 versus +0.10 for entering at the cross. Small,
+  but it is the direction the trader claimed, and the opposite of what the broken version
+  said.
+- **Trading the state rather than the crossing tests negative** at every decision time
+  from 09:30 to 11:00. Being above VWAP at a given hour does not predict the rest of the day.
+- Best case overall is **edge +0.13, EOD mean +0.112%** — against roughly +0.4 for the ORB
+  strategy already running. Nothing here is competitive with what exists.
+
+A 20-period EMA on 5-minute candles needs 100 minutes of bars. Any future work must carry
+the EMA across sessions or the indicator is not valid before ~10:55.
+
+### The finding that changes things (SUPERSEDED — see correction above)
 
 Prompted by a TradingView screenshot where EMA read 1,256.92 and VWAP 1,256.86 — a 0.005%
 gap. **Most "crossovers" are two lines hugging, not a regime change.** Requiring the EMA to
@@ -115,15 +150,21 @@ Two conclusions:
 
 ## What to do next, in order
 
-1. **Does it survive costs?** Run stop/target combinations on the gap-filtered crossover
-   set (n=186 and n=109) with `costBps: 5` and slippage on market exits. If +0.21 doesn't
-   become positive rupees, stop here — everything below is wasted effort.
-2. **Widen the sample.** Re-run on all 39 of `_ORB_BRERAKOUT_CORE.txt`, not 8. Check the
-   gap plateau still holds.
-3. **Re-test the pullback on top of the gap filter.** With the crossover finally qualified,
-   the pullback may now add the entry-price advantage it's supposed to. Compare
-   `gap + cross entry` against `gap + pullback entry` head to head.
+The honest position after the correction: **best measured edge is +0.13, versus ~+0.4 for
+the ORB strategy already live.** There is no strong reason to build this. Only continue if
+the trader supplies a missing rule.
+
+1. **Ask the trader what makes him skip a cross** — and whether his EMA is session-reset or
+   continuous. Every number here says the edge lives in whatever that answer is. This is
+   the single highest-value action and it costs nothing.
+2. If he adds a rule, re-run `research/emavwap.js` with it. Keep the EMA continuous.
+3. **Only if edge clears ~+0.3** on 39 symbols, test stop/target with `costBps: 5` and
+   slippage on market exits.
 4. **Then, and only then, refactor** (see below).
+
+Do not spend time on: the gap/separation filter, VWAP slope, quiet-volume, first-cross-only,
+or trading the state at a fixed time. All measured neutral-to-negative with the correct
+indicator.
 
 **Ask the trader one question:** *what makes him skip a cross?* Every number above says his
 edge lives in whatever that answer is. The separation filter is probably part of it, but

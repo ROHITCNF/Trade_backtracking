@@ -42,8 +42,11 @@ function loadDays(symbol) {
   return days;
 }
 
-// EMA of close and session VWAP, both reset daily. gapPct is how far the EMA sits
-// from VWAP — the measure that turned out to matter most.
+// WARNING: this resets the EMA daily, which is NOT what TradingView does — its
+// "EMA 20 close" runs continuously across sessions while "VWAP Session" resets.
+// Results from this function overstate the gap filter badly; see the correction in
+// plan.md. Kept as-is to document what was measured. Carry the EMA across days
+// before drawing any new conclusion.
 function annotate(bars, period = 20) {
   const k = 2 / (period + 1);
   let ema = null;
