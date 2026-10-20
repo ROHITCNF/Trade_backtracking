@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ORB Backtest Report</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<!--TICKERS-->
 <style>
   :root {
     --bg: #0f1115;
@@ -126,10 +127,12 @@ const cls = (n) => (n >= 0 ? 'pos' : 'neg');
 
 /* ---------- ticker dropdown ---------- */
 // Each ticker is its own generated page; selecting one just navigates there.
-if (DATA.tickers && DATA.tickers.length > 1) {
+// window.TICKERS comes from out/tickers.js, loaded only on runAll.js pages.
+const TICKERS = window.TICKERS || [];
+if (TICKERS.length > 1) {
   const picker = document.getElementById('tickerPicker');
   picker.hidden = false;
-  picker.innerHTML = DATA.tickers
+  picker.innerHTML = TICKERS
     .map((t) => `<option value="${t.file}"${t.symbol === DATA.config.symbol ? ' selected' : ''}>${t.symbol}</option>`)
     .join('');
   picker.onchange = () => { window.location.href = picker.value; };
