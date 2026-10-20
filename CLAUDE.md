@@ -5,39 +5,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm start          # one ticker (config.symbol) -> out/report.html
-npm run report     # same, then open it
-npm run sweep      # compare every profit-target rule on the same candles
-node runAll.js 5   # first 5 tickers from fno.txt
-node runAll.js all # the whole watchlist
+npm run login                # once a day: Fyers OAuth, saves data/token.json
+npm start                    # one ticker (config.symbol) -> out/report.html
+npm run report               # same, then open it
+npm run sweep                # compare every profit-target rule on the same candles
+node runAll.js 5             # first 5 tickers from lists/fno.txt, one page each
+node runAll.js all final.txt # every ticker in lists/final.txt  (npm run final)
+npm run core                 # summary.js over lists/core.txt -> out/summary.html
+npm run live                 # live paper runner (see server/architecture.md)
+npm run today                # print today's live decision log
 ```
 
-**Single-ticker is the default working mode.** `config.singleTickerOnly` is `true`, which makes
-`runAll.js` refuse to start; the strategy is still being validated on one name before it is worth
-looking at others. Leave it alone unless the user asks to open up the watchlist. `runAll.js` also
-demands an explicit count — there is no bare invocation — because the watchlist is 207 symbols,
-roughly 1,000 chunked API calls and ~600 MB of cache.
+`runAll.js` and `summary.js` demand an explicit count (`5`, `all`) and take an optional list name
+from `lists/`. There is no bare invocation, because `fno.txt` is 207 symbols — about 1,400 API
+calls for a year of 1-minute data.
 
-`runAll.js` writes one page per ticker (`out/NSE_RVNL_EQ.html`) with a dropdown that navigates
-between them. It runs in two passes: the first fetches and backtests to learn which symbols have
-usable data, the second writes the pages once the dropdown list is known. The second pass is
-network-free because everything is cached by then, and it exists so the dropdown never links to a
-page that was never written.
+`runAll.js` writes one page per ticker (`out/NSE_RVNL_EQ.html`) as each finishes, then writes
+`out/tickers.js`, which those pages load for their dropdown, so the dropdown only ever names pages
+that exist. `summary.js` writes one page with a row per symbol and pooled totals, no day charts.
 
-No dependencies and no build step — Node 18+ native `fetch` only. There is no test runner; the engine
-is a pure function, so exercise it by requiring `src/engine.js` and feeding it synthetic candle arrays.
+One dependency (`fyers-api-v3`), no build step, Node 18+. There is no test runner; the engine is a
+pure function, so exercise it by requiring `src/engine.js` and feeding it synthetic candle arrays.
 
 ## Pipeline
 
-`index.js` wires four stages together, each in its own module and each independently runnable:
+`src/run.js` (`backtestSymbol`, `runList`) wires the stages together for every entry script:
 
-1. `src/fetch.js` — pulls candles from Fyers' internal history API and caches them under
-   `data/candles/`. Requests are chunked 60 days at a time because intraday history is capped
-   per request.
+1. `src/fetch.js` — pulls candles from Fyers' history API via the SDK, 60 days per request. **No
+   cache**: every run fetches fresh, so every run needs today's token. All REST goes through
+   `rest()` in `src/fyers.js`, which spaces calls ≥350 ms apart to stay under the 200/min cap
+   (three breaches in a day block the account, live runner included).
 2. `src/engine.js` — pure backtest. Candles + config in, trades out. No network, no disk.
 3. `src/metrics.js` — trades in, summary stats + equity curve out.
 4. `src/tradeLog.js` — dumps the run to `data/trades/<SYMBOL>.json` and `.csv`.
 5. `src/report.js` — injects results as JSON into `src/template.html`, writes `out/report.html`.
+
+Shared helpers: `src/time.js` (IST handling, `istToday`), `src/util.js` (`round`, `shortSymbol`),
+`src/tickers.js` (reads `lists/*.txt`).
 
 ## Inspecting a run without the browser
 
@@ -46,9 +50,6 @@ trade). Day candles are stripped from both — they are 98% of the payload and c
 for reading trades. These files are the fastest way to answer questions about a run: read the JSON
 or grep the CSV rather than regenerating anything. They are overwritten on each run for that symbol,
 so they always reflect the latest config.
-
-The fetch/engine split is deliberate: the Fyers token expires roughly daily, so candles are cached
-once and the backtest re-runs offline as many times as you like while tuning parameters.
 
 `config.js` holds every tunable knob. Prefer changing it over hardcoding values elsewhere.
 
@@ -100,8 +101,15 @@ carries its day's candles in the JSON payload; that's what makes the file large,
 Charts come from Lightweight Charts v4 via CDN — the v5 series API is different, so keep the pinned
 version in sync with the `addCandlestickSeries` / `addAreaSeries` calls in the template.
 
+## Live runner
+
+`server/` runs the same `runBacktest` on live websocket ticks and records paper decisions to
+`data/live/`. It places no orders. `src/engine.js` stays the only place strategy logic lives; see
+`server/architecture.md` before touching it.
+
 ## Credentials
 
-`FYERS_AUTH_TOKEN` and `FYERS_TOKEN_ID` come from `.env` (gitignored, loaded by `src/env.js`).
-They expire roughly daily; a 401 during fetch means they need refreshing from a logged-in session.
-Never paste them into tracked source files.
+`FYERS_APP_ID`, `FYERS_SECRET_ID` and `FYERS_REDIRECT_URI` live in `.env` (gitignored, loaded by
+`src/env.js`; see `.env.example`). `npm run login` exchanges them for an access token saved to
+`data/token.json`, valid until the end of the IST day. "No Fyers token for today" means run it
+again. Never paste credentials or tokens into tracked source files.

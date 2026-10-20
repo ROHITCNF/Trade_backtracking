@@ -26,7 +26,13 @@ const VARIANTS = [
 
 async function main() {
   const candles = await getCandles(baseConfig);
-  const stopRule = baseConfig.slMode === 'range' ? 'opposite range edge' : `${baseConfig.slPct}% of entry`;
+  const pct = `${baseConfig.slPct}% of entry`;
+  const stopRule = {
+    pct,
+    range: 'opposite range edge',
+    tighter: `tighter of ${pct} / range edge`,
+    wider: `wider of ${pct} / range edge`,
+  }[baseConfig.slMode];
   console.log(`\n${baseConfig.symbol}  ${baseConfig.fromDate} -> ${baseConfig.toDate}  (${candles.length} candles)`);
   console.log(`direction: ${baseConfig.direction}   stop: ${stopRule}   (only the target varies below)\n`);
 
