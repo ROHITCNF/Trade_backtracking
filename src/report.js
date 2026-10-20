@@ -1,16 +1,15 @@
-// Injects the backtest results into template.html and writes a standalone file.
+// Injects results into an HTML template and writes a standalone file to out/.
 
 const fs = require('fs');
 const path = require('path');
 
 const OUT_DIR = path.join(__dirname, '..', 'out');
 
-// `tickers` is the dropdown list: [{ symbol, file }]. Empty list hides the dropdown.
-function writeReport(trades, metrics, config, { tickers = [], fileName = 'report.html' } = {}) {
-  const template = fs.readFileSync(path.join(__dirname, 'template.html'), 'utf8');
+function renderTemplate(templateName, data, fileName, html = (t) => t) {
+  const template = html(fs.readFileSync(path.join(__dirname, templateName), 'utf8'));
 
   // </script> inside the JSON would close the tag early and break the page.
-  const json = JSON.stringify({ trades, metrics, config, tickers }).replace(/</g, '\\u003c');
+  const json = JSON.stringify(data).replace(/</g, '\\u003c');
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const file = path.join(OUT_DIR, fileName);
@@ -18,4 +17,12 @@ function writeReport(trades, metrics, config, { tickers = [], fileName = 'report
   return file;
 }
 
-module.exports = { writeReport };
+// withTickerList loads out/tickers.js (written by runAll.js) for the dropdown.
+function writeReport(trades, metrics, config, { fileName = 'report.html', withTickerList = false } = {}) {
+  const tickerScript = withTickerList ? '<script src="tickers.js"></script>' : '';
+  return renderTemplate('template.html', { trades, metrics, config }, fileName, (t) =>
+    t.replace('<!--TICKERS-->', tickerScript)
+  );
+}
+
+module.exports = { writeReport, renderTemplate, OUT_DIR };

@@ -6,10 +6,6 @@ module.exports = {
   fromDate: "2026-09-29",
   toDate: "2026-10-19",
 
-  // Blocks runAll.js so only `symbol` above is ever tested. Keep this true while
-  // validating the strategy on one name; flip it to false to open up _F&O.txt.
-  singleTickerOnly: false,
-
   // --- Strategy ---
   // 'long' | 'short' | 'both'. With 'both', the first clean break decides the side.
   // A candle that breaks the range high AND low in the same bar is ambiguous, so it

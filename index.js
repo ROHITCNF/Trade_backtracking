@@ -1,22 +1,16 @@
-// Entry point: fetch (or reuse cached) candles -> backtest -> metrics -> HTML report.
+// Entry point: fetch candles -> backtest -> metrics -> HTML report.
 
 const path = require('path');
 const { loadEnv } = require('./src/env');
 loadEnv();
 
-const config = require('./config');
-const { getCandles } = require('./src/fetch');
-const { runBacktest } = require('./src/engine');
-const { computeMetrics } = require('./src/metrics');
+const { symbol } = require('./config');
+const { backtestSymbol } = require('./src/run');
 const { writeReport } = require('./src/report');
 const { writeTradeLog } = require('./src/tradeLog');
 
 async function main() {
-  const candles = await getCandles(config);
-  console.log(`Loaded ${candles.length} candles.`);
-
-  const trades = runBacktest(candles, config);
-  const metrics = computeMetrics(trades);
+  const { config, trades, metrics } = await backtestSymbol(symbol);
 
   console.log(
     `${metrics.totalTrades} trades · ${metrics.winRate}% win rate · ` +
