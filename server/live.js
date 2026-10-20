@@ -19,7 +19,7 @@ const { startFeed } = require('./feed');
 const { createPaperBroker } = require('./broker/paper');
 const state = require('./state');
 
-const LIST = process.env.LIVE_LIST || '_ORB_BRERAKOUT_CORE.txt';
+const LIST = process.env.LIVE_LIST || 'core.txt';
 
 // The engine returns a finished trade or nothing; it has no idea a day is still
 // running. Combining its exit reason with the clock tells us what is actually

@@ -2,7 +2,7 @@
 //
 //   node research/emavwap.js
 //
-// Reproduces every number in plan.md. Touches no project code: it fetches
+// Reproduces every number in emavwap.md. Touches no project code: it fetches
 // 5-minute candles itself and computes its own indicators, so the ORB engine
 // and the live runner are unaffected by anything here. Needs today's Fyers
 // token (`npm run login`).
@@ -39,7 +39,7 @@ async function fetchDays(symbol) {
 // WARNING: this resets the EMA daily, which is NOT what TradingView does — its
 // "EMA 20 close" runs continuously across sessions while "VWAP Session" resets.
 // Results from this function overstate the gap filter badly; see the correction in
-// plan.md. Kept as-is to document what was measured. Carry the EMA across days
+// emavwap.md. Kept as-is to document what was measured. Carry the EMA across days
 // before drawing any new conclusion.
 function annotate(bars, period = 20) {
   const k = 2 / (period + 1);
@@ -190,7 +190,7 @@ async function main() {
   report('PULLBACK entry, gap>=0.20% within 5 bars', { entryMode: 'pullback', minGap: 0.2, confirmBars: 5 });
   report('PULLBACK entry, gap>=0.30% within 8 bars', { entryMode: 'pullback', minGap: 0.3, confirmBars: 8 });
 
-  console.log('\nSee plan.md for what these numbers mean and what to do next.\n');
+  console.log('\nSee emavwap.md for what these numbers mean and what to do next.\n');
 }
 
 main().catch((err) => {
