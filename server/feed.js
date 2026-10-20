@@ -1,6 +1,6 @@
 // Wraps the Fyers data socket. Only `symbol` and `ltp` are used, so lite and full
 // mode both work — full just carries extra fields the candle builder ignores.
-// Set DEBUG_TICKS=1 in server/.env to see every frame.
+// Set DEBUG_TICKS=1 in .env to see every frame.
 
 const { fyersDataSocket } = require("fyers-api-v3");
 const path = require("path");

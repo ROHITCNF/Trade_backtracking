@@ -2,9 +2,9 @@
 //
 //   npm run login
 
-require('../src/env').loadEnv(require('path').join(__dirname, '.env'));
+require('../src/env').loadEnv();
 
-const { newClient, saveToken, readToken, today } = require('./auth');
+const { newClient, saveToken, readToken, today } = require('../src/fyers');
 const { waitForAuthCode } = require('./callback');
 
 async function main() {

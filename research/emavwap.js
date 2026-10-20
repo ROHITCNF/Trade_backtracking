@@ -2,37 +2,31 @@
 //
 //   node research/emavwap.js
 //
-// Reproduces every number in plan.md. Touches no project code: it reads cached
-// 5-minute candles directly and computes its own indicators, so the ORB engine
-// and the live runner are unaffected by anything here.
-//
-// Needs 5-minute candles cached first:
-//   node -e "require('./src/env').loadEnv(); \
-//     require('./src/fetch').getCandles({...require('./config'), \
-//     symbol:'NSE:LAURUSLABS-EQ', resolution:'5', \
-//     fromDate:'2026-01-01', toDate:'2026-09-23'})"
-//
-// Cache filenames carry the resolution, so 1m and 5m data coexist safely.
+// Reproduces every number in plan.md. Touches no project code: it fetches
+// 5-minute candles itself and computes its own indicators, so the ORB engine
+// and the live runner are unaffected by anything here. Needs today's Fyers
+// token (`npm run login`).
 
-const fs = require('fs');
-const path = require('path');
+require('../src/env').loadEnv();
+const { getCandles } = require('../src/fetch');
 const { istParts, toMinutes } = require('../src/time');
 
 const SYMBOLS = ['LAURUSLABS', 'PAYTM', 'CDSL', 'ITC', 'INFY', 'LODHA', 'VEDL', 'NBCC'];
 const FROM = '2026-01-01';
 const TO = '2026-09-23';
-const DIR = path.join(__dirname, '..', 'data', 'candles');
 
 const SESSION_START = toMinutes('09:15');
 const NO_NEW_TRADES_AFTER = toMinutes('13:00');
 const SESSION_END = toMinutes('15:14');
 
-function loadDays(symbol) {
-  const file = path.join(DIR, `NSE_${symbol}_EQ_5m_${FROM}_${TO}.json`);
-  if (!fs.existsSync(file)) return null;
+// symbol -> Map<date, bars>, filled once by main() before any report runs.
+const DAYS = new Map();
+const loadDays = (symbol) => DAYS.get(symbol) || null;
 
+async function fetchDays(symbol) {
+  const candles = await getCandles({ symbol: `NSE:${symbol}-EQ`, resolution: '5', fromDate: FROM, toDate: TO });
   const days = new Map();
-  for (const [t, o, h, l, c, v] of JSON.parse(fs.readFileSync(file, 'utf8'))) {
+  for (const [t, o, h, l, c, v] of candles) {
     const { date, minute } = istParts(t);
     if (minute < SESSION_START) continue;
     if (!days.has(date)) days.set(date, []);
@@ -169,27 +163,37 @@ function report(label, opts) {
   );
 }
 
-const missing = SYMBOLS.filter((s) => !loadDays(s));
-if (missing.length) {
-  console.log(`\nNo 5-minute cache for: ${missing.join(', ')}`);
-  console.log(`Expected files like data/candles/NSE_<SYM>_EQ_5m_${FROM}_${TO}.json`);
-  console.log('See the fetch snippet at the top of this file.\n');
-  if (missing.length === SYMBOLS.length) process.exit(1);
+async function main() {
+  const missing = [];
+  for (const symbol of SYMBOLS) {
+    try {
+      DAYS.set(symbol, await fetchDays(symbol));
+    } catch (err) {
+      missing.push(symbol);
+      console.log(`  ${symbol}: ${err.message}`);
+    }
+  }
+  if (missing.length === SYMBOLS.length) throw new Error('No symbol could be fetched.');
+
+  console.log(`\nEMA20 / VWAP — ${SYMBOLS.length} symbols, ${FROM} to ${TO}`);
+  console.log('"edge" = median MFE minus median MAE. Must be clearly positive to matter.\n');
+  console.log('setup'.padEnd(46), '   n  MFEp50  MAEp50    edge  EODmean');
+  console.log('-'.repeat(84));
+
+  report('CROSSOVER entry, no gap filter', { entryMode: 'cross' });
+  report('CROSSOVER entry, gap>=0.10% within 3 bars', { entryMode: 'cross', minGap: 0.1, confirmBars: 3 });
+  report('CROSSOVER entry, gap>=0.20% within 5 bars', { entryMode: 'cross', minGap: 0.2, confirmBars: 5 });
+  report('CROSSOVER entry, gap>=0.30% within 8 bars', { entryMode: 'cross', minGap: 0.3, confirmBars: 8 });
+  console.log('');
+  report('PULLBACK entry, no gap filter', { entryMode: 'pullback' });
+  report('PULLBACK entry, gap>=0.10% within 3 bars', { entryMode: 'pullback', minGap: 0.1, confirmBars: 3 });
+  report('PULLBACK entry, gap>=0.20% within 5 bars', { entryMode: 'pullback', minGap: 0.2, confirmBars: 5 });
+  report('PULLBACK entry, gap>=0.30% within 8 bars', { entryMode: 'pullback', minGap: 0.3, confirmBars: 8 });
+
+  console.log('\nSee plan.md for what these numbers mean and what to do next.\n');
 }
 
-console.log(`\nEMA20 / VWAP — ${SYMBOLS.length} symbols, ${FROM} to ${TO}`);
-console.log('"edge" = median MFE minus median MAE. Must be clearly positive to matter.\n');
-console.log('setup'.padEnd(46), '   n  MFEp50  MAEp50    edge  EODmean');
-console.log('-'.repeat(84));
-
-report('CROSSOVER entry, no gap filter', { entryMode: 'cross' });
-report('CROSSOVER entry, gap>=0.10% within 3 bars', { entryMode: 'cross', minGap: 0.1, confirmBars: 3 });
-report('CROSSOVER entry, gap>=0.20% within 5 bars', { entryMode: 'cross', minGap: 0.2, confirmBars: 5 });
-report('CROSSOVER entry, gap>=0.30% within 8 bars', { entryMode: 'cross', minGap: 0.3, confirmBars: 8 });
-console.log('');
-report('PULLBACK entry, no gap filter', { entryMode: 'pullback' });
-report('PULLBACK entry, gap>=0.10% within 3 bars', { entryMode: 'pullback', minGap: 0.1, confirmBars: 3 });
-report('PULLBACK entry, gap>=0.20% within 5 bars', { entryMode: 'pullback', minGap: 0.2, confirmBars: 5 });
-report('PULLBACK entry, gap>=0.30% within 8 bars', { entryMode: 'pullback', minGap: 0.3, confirmBars: 8 });
-
-console.log('\nSee plan.md for what these numbers mean and what to do next.\n');
+main().catch((err) => {
+  console.error('\n' + err.message);
+  process.exit(1);
+});

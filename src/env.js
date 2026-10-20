@@ -1,10 +1,8 @@
 // Minimal .env loader so there are no npm dependencies.
-// Missing file is fine — cached candles don't need credentials.
 
 const fs = require('fs');
 const path = require('path');
 
-// Defaults to the project-root .env; the live runner passes server/.env.
 function loadEnv(file = path.join(__dirname, '..', '.env')) {
   if (!fs.existsSync(file)) return;
 
