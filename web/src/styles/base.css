@@ -311,3 +311,4 @@ tr.clickable { cursor: pointer; }
   .page-head > .spacer { flex-basis: 100%; }
   html, body { overflow-x: hidden; }
 }
+@media (max-width: 1500px) { .hide-md { display: none; } }

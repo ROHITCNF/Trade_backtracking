@@ -52,6 +52,8 @@ npm run web                  # frontend on :5173, proxying /api to :4000
 The migration test runs only with a server to point it at; it creates and drops its own
 database: `TEST_DATABASE_URL=postgres://localhost/postgres npm test`.
 
+Deploying the web app (Render + Neon): [docs/deploy.md](docs/deploy.md).
+
 ## Usage
 
 ```bash
