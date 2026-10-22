@@ -6,6 +6,7 @@ import { applyTheme, readTheme } from './lib/theme.js';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
+import './styles/form.css';
 
 applyTheme(readTheme());
 
