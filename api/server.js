@@ -11,6 +11,7 @@ const { fyersRoutes } = require('./routes/fyers');
 const { symbolRoutes } = require('./routes/symbols');
 const { runRoutes } = require('./routes/runs');
 const { analysisRoutes } = require('./routes/analysis');
+const { watchlistRoutes } = require('./routes/watchlists');
 
 // Builds the app without listening, so tests can drive it with app.inject().
 function buildApp({ pool, config, worker = null, symbols = null, logger = false, loginLimiter, newFyersClient, getCandles }) {
@@ -28,6 +29,7 @@ function buildApp({ pool, config, worker = null, symbols = null, logger = false,
   if (symbols) app.register(symbolRoutes, { symbols });
   app.register(runRoutes, { symbols });
   app.register(analysisRoutes, { getCandles });
+  app.register(watchlistRoutes);
 
   // Liveness for Render: up, and the database answers.
   app.get('/api/health', async (request, reply) => {
@@ -52,9 +54,12 @@ async function start() {
   const { setStore } = require('../src/fyers');
   const { createWorker } = require('./worker');
   const { createSymbolMaster } = require('./symbols');
+  const { seedWatchlists } = require('./db/watchlists');
 
   const pool = getPool();
   await migrate(pool);
+  const seeded = await seedWatchlists(pool);
+  if (seeded.length) console.log(`seeded watchlists: ${seeded.join(', ')}`);
   setStore(createPgStore(pool));
 
   const worker = createWorker({ pool });
