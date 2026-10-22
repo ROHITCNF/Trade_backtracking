@@ -7,6 +7,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
+    "test": "node --test test/*.test.js",
     "start": "node index.js",
     "report": "node index.js && open out/report.html",
     "sweep": "node sweep.js",
