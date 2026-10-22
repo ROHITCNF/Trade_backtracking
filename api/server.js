@@ -10,9 +10,10 @@ const { authRoutes } = require('./routes/auth');
 const { fyersRoutes } = require('./routes/fyers');
 const { symbolRoutes } = require('./routes/symbols');
 const { runRoutes } = require('./routes/runs');
+const { analysisRoutes } = require('./routes/analysis');
 
 // Builds the app without listening, so tests can drive it with app.inject().
-function buildApp({ pool, config, worker = null, symbols = null, logger = false, loginLimiter, newFyersClient }) {
+function buildApp({ pool, config, worker = null, symbols = null, logger = false, loginLimiter, newFyersClient, getCandles }) {
   const app = Fastify({ logger, trustProxy: config.production });
   app.decorate('db', pool);
   app.decorate('worker', worker);
@@ -26,6 +27,7 @@ function buildApp({ pool, config, worker = null, symbols = null, logger = false,
   app.register(fyersRoutes, { config, newClient: newFyersClient });
   if (symbols) app.register(symbolRoutes, { symbols });
   app.register(runRoutes, { symbols });
+  app.register(analysisRoutes, { getCandles });
 
   // Liveness for Render: up, and the database answers.
   app.get('/api/health', async (request, reply) => {

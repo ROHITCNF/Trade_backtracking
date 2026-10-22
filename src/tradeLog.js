@@ -12,9 +12,9 @@ const COLUMNS = [
   'exitTime', 'exit', 'reason', 'quantity', 'notional', 'pnl', 'pnlPct', 'rMultiple',
 ];
 
-function toCsv(trades) {
-  const rows = trades.map((t) => COLUMNS.map((c) => (t[c] === null ? '' : t[c])).join(','));
-  return [COLUMNS.join(','), ...rows].join('\n') + '\n';
+function toCsv(trades, columns = COLUMNS) {
+  const rows = trades.map((t) => columns.map((c) => (t[c] === null ? '' : t[c])).join(','));
+  return [columns.join(','), ...rows].join('\n') + '\n';
 }
 
 // Returns the paths written, newest run overwriting the previous one for that symbol.
@@ -36,4 +36,4 @@ function writeTradeLog(trades, metrics, config) {
   return { jsonFile, csvFile };
 }
 
-module.exports = { writeTradeLog };
+module.exports = { writeTradeLog, toCsv, COLUMNS };

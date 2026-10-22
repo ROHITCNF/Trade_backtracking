@@ -2,9 +2,9 @@
 // parity test (test/parity.test.js) holds this mapping to zero differences.
 
 // Postgres returns numeric and bigint as strings; these come back as numbers.
-const NUMERIC = ['orbHigh', 'orbLow', 'entryTs', 'entry', 'sl', 'target', 'exitTs', 'exit', 'notional', 'pnl', 'pnlPct', 'rMultiple'];
+const NUMERIC = ['id', 'orbHigh', 'orbLow', 'entryTs', 'entry', 'sl', 'target', 'exitTs', 'exit', 'notional', 'pnl', 'pnlPct', 'rMultiple'];
 
-const COLUMNS = `symbol, date::text as date, side, orb_high as "orbHigh", orb_low as "orbLow",
+const COLUMNS = `id, symbol, date::text as date, side, orb_high as "orbHigh", orb_low as "orbLow",
   entry_time as "entryTime", entry_ts as "entryTs", entry, sl, target, exit_time as "exitTime",
   exit_ts as "exitTs", exit, reason, quantity, notional, pnl, pnl_pct as "pnlPct", r_multiple as "rMultiple"`;
 
@@ -32,7 +32,8 @@ async function insertTrades(client, runId, symbol, trades) {
   );
 }
 
-// A run's trades in entry order, optionally for one symbol. Each carries its symbol.
+// A run's trades in entry order, optionally for one symbol. Each carries its
+// row id and symbol.
 async function loadTrades(db, runId, { symbol } = {}) {
   const { rows } = await db.query(
     `select ${COLUMNS} from trades where run_id = $1 and ($2::text is null or symbol = $2)
@@ -42,4 +43,9 @@ async function loadTrades(db, runId, { symbol } = {}) {
   return rows.map(rowToTrade);
 }
 
-module.exports = { insertTrades, loadTrades };
+async function loadTrade(db, id) {
+  const { rows } = await db.query(`select run_id as "runId", ${COLUMNS} from trades where id = $1`, [id]);
+  return rows.length ? { ...rowToTrade(rows[0]), runId: Number(rows[0].runId) } : null;
+}
+
+module.exports = { insertTrades, loadTrades, loadTrade };
