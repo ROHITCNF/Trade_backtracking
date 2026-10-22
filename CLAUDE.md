@@ -14,6 +14,7 @@ node runAll.js all final.txt # every ticker in lists/final.txt  (npm run final)
 npm run core                 # summary.js over lists/core.txt -> out/summary.html
 npm run live                 # live paper runner (see server/architecture.md)
 npm run today                # print today's live decision log
+npm test                     # node --test over test/*.test.js
 ```
 
 `runAll.js` and `summary.js` demand an explicit count (`5`, `all`) and take an optional list name
@@ -24,8 +25,9 @@ calls (~30 minutes at 50/min) for a year of 1-minute data.
 `out/tickers.js`, which those pages load for their dropdown, so the dropdown only ever names pages
 that exist. `summary.js` writes one page with a row per symbol and pooled totals, no day charts.
 
-One dependency (`fyers-api-v3`), no build step, Node 18+. There is no test runner; the engine is a
-pure function, so exercise it by requiring `src/engine.js` and feeding it synthetic candle arrays.
+One dependency (`fyers-api-v3`), no build step, Node 18+. `npm test` runs `node --test` over
+`test/*.test.js` (built-in runner, no extra deps). The engine is a pure function, so tests feed it
+synthetic candles built with `test/helpers.js`; add a test there when changing engine behaviour.
 
 ## Pipeline
 
