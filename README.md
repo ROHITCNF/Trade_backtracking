@@ -41,6 +41,8 @@ brew install postgresql@17
 brew services start postgresql@17
 /opt/homebrew/opt/postgresql@17/bin/createdb backtest
 echo 'DATABASE_URL=postgres://localhost/backtest' >> .env
+echo "SESSION_SECRET=$(openssl rand -hex 32)" >> .env
+echo "APP_PASSWORD_HASH=$(npm run -s hash-password)" >> .env   # prompts for the app password
 npm run migrate              # applies api/db/migrations/*.sql; rerunning is a no-op
 npm run api                  # web API + run worker on :4000; migrates on boot
 ```
