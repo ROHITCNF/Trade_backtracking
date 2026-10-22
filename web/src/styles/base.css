@@ -260,3 +260,27 @@ tr.clickable { cursor: pointer; }
 .exp-bar > .pos { left: 50%; background: var(--profit); }
 .exp-bar > .neg { right: 50%; background: var(--loss); }
 @media (max-width: 900px) { .compare-cols { grid-template-columns: 1fr !important; } }
+
+/* Watchlists */
+.wl-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--s-4); align-items: start; }
+.wl-list { padding: 0; overflow: hidden; }
+.wl-item { display: flex; justify-content: space-between; align-items: center; padding: var(--s-3) var(--s-4); color: var(--ink); border-top: 1px solid var(--line); }
+.wl-item:first-child { border-top: 0; }
+.wl-item:hover { background: var(--surface-2); text-decoration: none; }
+.wl-item.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.wl-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-3); align-items: start; }
+.wl-tools .search { max-width: none; }
+.drop-zone { display: flex; align-items: center; gap: var(--s-3); text-align: left; font: inherit; color: var(--accent); cursor: pointer; padding: var(--s-2) var(--s-3); border: 1px dashed var(--line-strong); border-radius: var(--r-input); background: var(--surface); }
+.drop-zone:hover { background: var(--accent-soft); }
+.danger-outline { color: var(--loss); }
+.import-card { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); border-color: var(--accent); }
+.file-name { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+.import-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); }
+.import-counts > div { display: flex; flex-direction: column; background: var(--surface-2); border-radius: var(--r-input); padding: var(--s-3); }
+.import-counts > div.warned { background: var(--warn-soft); color: var(--warn); }
+.import-counts > div.warned .label { color: var(--warn); }
+.chip-add { background: var(--accent-soft); padding-right: 10px; }
+.chip-already { color: var(--muted); text-decoration: line-through; padding-right: 10px; }
+@media (max-width: 900px) {
+  .wl-layout, .wl-tools { grid-template-columns: 1fr; }
+}

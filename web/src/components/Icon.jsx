@@ -7,6 +7,7 @@ const PATHS = {
   clock: <><circle cx="10" cy="10" r="7.5" /><path d="M10 6v4l2.5 2" /></>,
   chart: <><path d="M3 14l4-4 3 2.5 6-6.5" /><path d="M3 17h14" /></>,
   close: <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" />,
+  upload: <><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5" /><path d="M4 13v3h12v-3" /></>,
 };
 
 export default function Icon({ name, size = 16 }) {
