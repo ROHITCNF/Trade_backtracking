@@ -1,0 +1,77 @@
+# Render Blueprint for the v1 web app (docs/hld.md § Deployment, § Configuration).
+# Two services from this repo: the API + run worker, and the static frontend.
+# The database is Neon, outside Render: paste its pooled connection string as
+# DATABASE_URL. Values marked `sync: false` are asked for when the Blueprint is
+# created; see docs/deploy.md for where each one comes from.
+
+services:
+  # API and run worker in one always-on process. A free instance sleeps when
+  # idle and would stall a running backtest (resume recovers it, but slowly).
+  - type: web
+    name: orb-lab-api
+    runtime: node
+    region: singapore
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    startCommand: node api/server.js
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - api/**
+        - src/**
+        - config.js
+        - lists/**
+        - package.json
+        - package-lock.json
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL # Neon pooled connection string (sslmode=require)
+        sync: false
+      - key: APP_PASSWORD_HASH # npm run -s hash-password
+        sync: false
+      - key: SESSION_SECRET # signs session tokens; changing it logs everyone out
+        generateValue: true
+      - key: TOKEN_ENC_KEY # 32 random bytes, base64; encrypts the Fyers token
+        generateValue: true
+      - key: FYERS_APP_ID # the second Fyers app, made for the web callback
+        sync: false
+      - key: FYERS_SECRET_ID
+        sync: false
+      - key: FYERS_REDIRECT_URI # https://<api host>/auth/fyers/callback
+        sync: false
+      - key: FRONTEND_URL # https://<static site host>, no trailing slash
+        sync: false
+      - key: REST_DAILY_CAP # leaves 1,000 of the account's 5,000 for the CLI
+        value: "3800"
+
+  # The React app, built to static files. Every path falls back to index.html
+  # so client-side routes survive a reload.
+  - type: web
+    name: orb-lab-web
+    runtime: static
+    buildCommand: cd web && npm ci && npm run build
+    staticPublishPath: web/dist
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - web/**
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_URL # https://<api host>, no trailing slash
+        sync: false

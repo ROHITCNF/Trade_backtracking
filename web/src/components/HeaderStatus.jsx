@@ -62,7 +62,7 @@ function ApiMeter({ budget }) {
       <span className={level === 'red' ? 'loss' : ''}>
         {qty(budget.used)} / {qty(budget.cap)}
       </span>
-      <span className="caption hide-sm">calls today</span>
+      <span className="caption hide-md">calls today</span>
     </span>
   );
 }
