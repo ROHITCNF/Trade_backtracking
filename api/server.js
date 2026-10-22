@@ -7,9 +7,10 @@ const cors = require('@fastify/cors');
 const { loadConfig } = require('./config');
 const { errorHandler, notFoundHandler } = require('./errors');
 const { authRoutes } = require('./routes/auth');
+const { fyersRoutes } = require('./routes/fyers');
 
 // Builds the app without listening, so tests can drive it with app.inject().
-function buildApp({ pool, config, worker = null, logger = false, loginLimiter }) {
+function buildApp({ pool, config, worker = null, logger = false, loginLimiter, newFyersClient }) {
   const app = Fastify({ logger, trustProxy: config.production });
   app.decorate('db', pool);
   app.decorate('worker', worker);
@@ -19,6 +20,7 @@ function buildApp({ pool, config, worker = null, logger = false, loginLimiter })
   // Only the frontend may call the API from a browser (NFR-9).
   app.register(cors, { origin: config.frontendUrl, methods: ['GET', 'POST', 'PATCH', 'DELETE'] });
   app.register(authRoutes, { config, limiter: loginLimiter });
+  app.register(fyersRoutes, { config, newClient: newFyersClient });
 
   // Liveness for Render: up, and the database answers.
   app.get('/api/health', async (request, reply) => {
