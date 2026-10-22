@@ -25,7 +25,7 @@ function createPgStore(pool) {
       await pool.query(
         `insert into fyers_token (id, token_enc, expires_at, updated_at) values (1, $1, $2, now())
          on conflict (id) do update set token_enc = excluded.token_enc, expires_at = excluded.expires_at,
-           updated_at = now()`,
+           client_name = null, updated_at = now()`,
         [encrypt(access_token), new Date(expiresAt)]
       );
     },
@@ -61,4 +61,15 @@ function createPgStore(pool) {
   };
 }
 
-module.exports = { createPgStore };
+// The Fyers client name shown in the header (FR-7). Not part of the store
+// contract: only the web app's OAuth callback knows it. saveToken clears it.
+async function setClientName(pool, name) {
+  await pool.query('update fyers_token set client_name = $1 where id = 1', [name]);
+}
+
+async function readClientName(pool) {
+  const { rows } = await pool.query('select client_name from fyers_token where id = 1');
+  return rows[0]?.client_name ?? null;
+}
+
+module.exports = { createPgStore, setClientName, readClientName };
