@@ -10,19 +10,8 @@ const baseConfig = require('./config');
 const { getCandles } = require('./src/fetch');
 const { runBacktest } = require('./src/engine');
 const { computeMetrics } = require('./src/metrics');
+const { TARGET_VARIANTS: VARIANTS } = require('./src/targets');
 
-// R here means "multiples of the stop distance", whatever config.slMode makes that.
-const VARIANTS = [
-  { label: 'no target (EOD)', targetMode: 'none' },
-  { label: '0.5R', targetMode: 'R', targetR: 0.5 },
-  { label: '1R', targetMode: 'R', targetR: 1 },
-  { label: '1.5R', targetMode: 'R', targetR: 1.5 },
-  { label: '2R', targetMode: 'R', targetR: 2 },
-  { label: '3R', targetMode: 'R', targetR: 3 },
-  { label: 'fixed 1%', targetMode: 'pct', targetPct: 1 },
-  { label: 'fixed 2%', targetMode: 'pct', targetPct: 2 },
-  { label: 'fixed 2.5%', targetMode: 'pct', targetPct: 2.5 },
-];
 
 async function main() {
   const candles = await getCandles(baseConfig);
