@@ -15,6 +15,8 @@ npm run core                 # summary.js over lists/core.txt -> out/summary.htm
 npm run live                 # live paper runner (see server/architecture.md)
 npm run today                # print today's live decision log
 npm test                     # node --test over test/*.test.js
+npm run api                  # web API + run worker (api/), needs DATABASE_URL
+npm run migrate              # apply api/db/migrations to DATABASE_URL
 ```
 
 `runAll.js` and `summary.js` demand an explicit count (`5`, `all`) and take an optional list name
