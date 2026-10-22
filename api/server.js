@@ -9,6 +9,7 @@ const { errorHandler, notFoundHandler } = require('./errors');
 const { authRoutes } = require('./routes/auth');
 const { fyersRoutes } = require('./routes/fyers');
 const { symbolRoutes } = require('./routes/symbols');
+const { runRoutes } = require('./routes/runs');
 
 // Builds the app without listening, so tests can drive it with app.inject().
 function buildApp({ pool, config, worker = null, symbols = null, logger = false, loginLimiter, newFyersClient }) {
@@ -24,6 +25,7 @@ function buildApp({ pool, config, worker = null, symbols = null, logger = false,
   app.register(authRoutes, { config, limiter: loginLimiter });
   app.register(fyersRoutes, { config, newClient: newFyersClient });
   if (symbols) app.register(symbolRoutes, { symbols });
+  app.register(runRoutes, { symbols });
 
   // Liveness for Render: up, and the database answers.
   app.get('/api/health', async (request, reply) => {
