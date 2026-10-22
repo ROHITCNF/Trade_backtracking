@@ -19,13 +19,15 @@
     "live": "node server/live.js",
     "today": "node server/today.js",
     "migrate": "node api/db/migrate.js",
-    "api": "node api/server.js"
+    "api": "node api/server.js",
+    "hash-password": "node api/auth/hashPassword.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
+    "bcryptjs": "^3.0.3",
     "fastify": "^5.12.7",
     "fyers-api-v3": "^2.3.0",
     "pg": "^8.23.1"
