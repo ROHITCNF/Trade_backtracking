@@ -8,36 +8,8 @@ const { createWorker } = require('../api/worker');
 const { createRun } = require('../api/db/runs');
 const { loadTrades } = require('../api/db/trades');
 const { runBacktest } = require('../src/engine');
-const { dateToEpoch, IST_OFFSET_SECONDS } = require('../src/time');
-const { round } = require('../src/util');
-const { config } = require('./helpers');
+const { config, walk } = require('./helpers');
 const { createTestDb, noDb } = require('./db');
-
-// Deterministic random walk: 09:15–15:29 one-minute candles on weekdays, with
-// overnight gaps, prices to 2 decimals, so trades hit every exit reason, both
-// sides, gap fills and odd-paise rounding.
-function walk(seed, start, days, from = '2026-01-05') {
-  let s = seed;
-  const rand = () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648);
-  const out = [];
-  let price = start;
-  for (let d = 0, day = dateToEpoch(from); d < days; day += 86400) {
-    const weekday = new Date((day + IST_OFFSET_SECONDS) * 1000).getUTCDay();
-    if (weekday === 0 || weekday === 6) continue;
-    d++;
-    price *= 1 + (rand() - 0.5) * 0.03;
-    const vol = price * (0.0005 + rand() * 0.002);
-    for (let m = 9 * 60 + 15; m < 15 * 60 + 30; m++) {
-      const o = round(price);
-      const c = round(o + (rand() - 0.5) * 2 * vol);
-      const h = round(Math.max(o, c) + rand() * vol);
-      const l = round(Math.min(o, c) - rand() * vol);
-      out.push([day + m * 60, o, h, l, c, 1000]);
-      price = c;
-    }
-  }
-  return out;
-}
 
 const CANDLES = {
   'NSE:LOW-EQ': walk(7, 87.35, 30),
@@ -75,7 +47,7 @@ test('trades stored in Postgres equal runBacktest output for every rule', { skip
     for (const [i, id] of ids.entries()) {
       for (const symbol of symbols) {
         const expected = runBacktest(CANDLES[symbol], { ...COMBOS[i], symbol }).map(({ candles, ...t }) => t);
-        const stored = (await loadTrades(pool, id, { symbol })).map(({ symbol: s, ...t }) => t);
+        const stored = (await loadTrades(pool, id, { symbol })).map(({ id: _id, symbol: s, ...t }) => t);
         assert.deepStrictEqual(stored, expected, `run ${id} ${JSON.stringify(COMBOS[i])} ${symbol}`);
         for (const t of expected) {
           seen.reasons.add(t.reason);
