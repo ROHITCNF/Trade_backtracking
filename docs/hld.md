@@ -492,9 +492,10 @@ Because there is no background polling, Neon can scale to zero while the app is 
 
 ## Migration from the current code
 
-1. **Storage seam in `src/fyers.js`.** Token and usage go behind a small store interface:
-   file store when `DATABASE_URL` is unset (the CLI, unchanged), Postgres store when it is
-   set (the web service). `DAILY_CAP` becomes `REST_DAILY_CAP` from env, defaulting to 4,800.
+1. **Storage seam in `src/fyers.js`.** Token and usage go behind a small store interface
+   (`src/fileStore.js` documents it). The file store is the default (the CLI, unchanged);
+   the web service calls `setStore()` with the Postgres store at boot, so a `DATABASE_URL`
+   in a shared `.env` never moves the CLI onto the database. `DAILY_CAP` becomes `REST_DAILY_CAP` from env, defaulting to 4,800.
    The CLI stays local-only and never touches the database (spec § Local CLI).
 2. **Schema + worker.** Migrations, then `api/worker.js` calling `getCandles` /
    `runBacktest` / `computeMetrics` exactly as `src/run.js` does.

@@ -1,7 +1,7 @@
 // Pulls candles from Fyers' history API through the official SDK. Nothing is
 // cached: every run fetches fresh, throttled by src/fyers.js.
 
-const { client, rest } = require('./fyers');
+const { getClient, rest } = require('./fyers');
 const { dateToEpoch } = require('./time');
 
 // Fyers caps intraday history at 100 days per request; 60 leaves margin.
@@ -11,8 +11,8 @@ const DAY_SECONDS = 86400;
 async function fetchChunk(symbol, resolution, from, to) {
   let res;
   try {
-    res = await rest(() =>
-      client().getHistory({
+    res = await rest(async () =>
+      (await getClient()).getHistory({
         symbol,
         resolution,
         date_format: '0',

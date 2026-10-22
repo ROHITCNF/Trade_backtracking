@@ -12,7 +12,7 @@ const { readTickers } = require('../src/tickers');
 const { runBacktest } = require('../src/engine');
 const { toMinutes, istParts, istToday } = require('../src/time');
 const { shortSymbol } = require('../src/util');
-const { client, socketToken } = require('../src/fyers');
+const { getClient, socketToken } = require('../src/fyers');
 const { CandleBuilder } = require('./candles');
 const { warmStart } = require('./warmstart');
 const { startFeed } = require('./feed');
@@ -39,7 +39,7 @@ async function main() {
   const symbols = readTickers(LIST);
   const sessionEndMin = toMinutes(baseConfig.sessionEnd);
 
-  client(); // fail fast if there is no token for today
+  await getClient(); // fail fast if there is no live token
   const saved = state.load(date);
 
   const books = new Map(symbols.map((s) => [s, new CandleBuilder()]));
@@ -107,7 +107,7 @@ async function main() {
 
   let connects = 0;
   startFeed({
-    token: socketToken(),
+    token: await socketToken(),
     symbols,
     onOpen: async () => {
       if (++connects === 1) return console.log('Feed connected. Watching.\n');
