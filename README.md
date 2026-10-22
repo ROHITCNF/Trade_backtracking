@@ -42,6 +42,7 @@ brew services start postgresql@17
 /opt/homebrew/opt/postgresql@17/bin/createdb backtest
 echo 'DATABASE_URL=postgres://localhost/backtest' >> .env
 npm run migrate              # applies api/db/migrations/*.sql; rerunning is a no-op
+npm run api                  # web API + run worker on :4000; migrates on boot
 ```
 
 The migration test runs only with a server to point it at; it creates and drops its own
