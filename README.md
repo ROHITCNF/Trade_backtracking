@@ -9,7 +9,7 @@ live runner. A deployed web dashboard is being added — see [docs/](docs/).
 |---|---|
 | Backtest engine + CLI reports | working |
 | Paper live runner (`server/`) | working, places no orders |
-| Web app (v1) | designed — [intent](docs/intent.md) · [spec](docs/spec.md) · [hld](docs/hld.md) · [decisions](docs/decisions.md) · [screens](docs/design/reference/) |
+| Web app (v1) | in progress — [intent](docs/intent.md) · [spec](docs/spec.md) · [hld](docs/hld.md) · [decisions](docs/decisions.md) · [plan](docs/plan.md) · [screens](docs/design/reference/) |
 
 ## Strategy in one paragraph
 
