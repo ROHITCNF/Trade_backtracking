@@ -44,3 +44,14 @@ test('tone colours only meaningful signs', () => {
   assert.equal(tone(0.001), 'flat');
   assert.equal(tone(null), 'flat');
 });
+
+import { istTime, istDateTime, duration } from '../src/lib/format.js';
+
+test('IST times and durations', () => {
+  assert.equal(istTime('2026-10-22T08:37:42Z'), '14:07');
+  assert.equal(istTime('2026-10-22T08:37:42Z', true), '14:07:42');
+  assert.equal(istDateTime('2026-10-21T13:12:00Z'), '21 Oct 2026, 18:42');
+  assert.equal(duration(347), '5m 47s');
+  assert.equal(duration(42), '42s');
+  assert.equal(duration(4000), '1h 6m');
+});
