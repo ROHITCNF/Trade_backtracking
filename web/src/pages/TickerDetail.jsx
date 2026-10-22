@@ -15,6 +15,7 @@ import { EquityChart } from '../components/charts.jsx';
 import MetricCards from '../components/MetricCards.jsx';
 import TradeChart from '../components/TradeChart.jsx';
 import Icon from '../components/Icon.jsx';
+import { useNarrow } from '../lib/useMedia.js';
 
 const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
 const candleCache = new Map(); // trade id -> response, for this browser session
@@ -91,7 +92,7 @@ function Num({ label, value, className = '' }) {
   );
 }
 
-function TradePanel({ trade, index, total, onPrev, onNext, onClose, orbEnd }) {
+function TradePanel({ trade, index, total, onPrev, onNext, onClose, orbEnd, mobile = false }) {
   const [retry, setRetry] = useState(0);
   const state = useCandles(trade.id, retry);
   const risk = Math.abs(trade.entry - trade.sl) * trade.quantity;
@@ -101,7 +102,7 @@ function TradePanel({ trade, index, total, onPrev, onNext, onClose, orbEnd }) {
   };
   return (
     <aside className="card trade-panel">
-      <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
           <div className="row">
             <span className="title">{short(trade.symbol)}</span>
@@ -111,10 +112,14 @@ function TradePanel({ trade, index, total, onPrev, onNext, onClose, orbEnd }) {
           </div>
           <span className="caption">{dateLong(trade.date)} · 1-minute · 09:15–15:30 IST</span>
         </div>
-        <span className="caption nowrap" style={{ marginTop: 8 }}>{index + 1} of {total}</span>
-        <button className="btn icon-btn" aria-label="Previous trade" disabled={index === 0} onClick={onPrev}>‹</button>
-        <button className="btn icon-btn" aria-label="Next trade" disabled={index === total - 1} onClick={onNext}>›</button>
-        <button className="btn btn-ghost icon-btn" aria-label="Close" onClick={onClose}><Icon name="close" /></button>
+        {!mobile && (
+          <>
+            <span className="caption nowrap" style={{ marginTop: 8 }}>{index + 1} of {total}</span>
+            <button className="btn icon-btn" aria-label="Previous trade" disabled={index === 0} onClick={onPrev}>‹</button>
+            <button className="btn icon-btn" aria-label="Next trade" disabled={index === total - 1} onClick={onNext}>›</button>
+            <button className="btn btn-ghost icon-btn" aria-label="Close" onClick={onClose}><Icon name="close" /></button>
+          </>
+        )}
       </div>
       <div key={`${trade.id}-${retry}`}>
         <ChartArea state={state} trade={trade} orbEnd={orbEnd} onRetry={reload} />
@@ -145,6 +150,12 @@ function TradePanel({ trade, index, total, onPrev, onNext, onClose, orbEnd }) {
         <Num label="OR low" value={`₹${price(trade.orbLow)}`} />
         <Num label="OR width" value={`${(((trade.orbHigh - trade.orbLow) / trade.orbLow) * 100).toFixed(2)}%`} />
       </div>
+      {mobile && (
+        <div className="trade-mobile-bar">
+          <button className="btn btn-lg" disabled={index === 0} onClick={onPrev}>‹ Previous</button>
+          <button className="btn btn-primary btn-lg" disabled={index === total - 1} onClick={onNext}>Next trade ›</button>
+        </div>
+      )}
     </aside>
   );
 }
@@ -154,6 +165,7 @@ export default function TickerDetail() {
   const [params, setParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const narrow = useNarrow();
 
   useEffect(() => {
     const q = `symbols=${encodeURIComponent(symbol)}`;
@@ -178,10 +190,24 @@ export default function TickerDetail() {
   const name = analysis.symbols[0]?.name;
   const trade = index >= 0 ? trades[index] : null;
 
+  if (trade && narrow) {
+    return (
+      <div className="stack">
+        <div className="row">
+          <button className="link-btn accent" onClick={() => select(null)}>‹ {short(symbol)}</button>
+          <span className="spacer" />
+          <span className="caption">Trade {index + 1} of {trades.length}</span>
+        </div>
+        <TradePanel key={trade.id} trade={trade} index={index} total={trades.length} orbEnd={run.config.orbEnd} mobile
+          onPrev={() => select(trades[index - 1].id)} onNext={() => select(trades[index + 1].id)} onClose={() => select(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className="stack">
       <div className="breadcrumb"><Link to="/runs">Runs</Link> / <Link to={`/runs/${run.id}`}>{runTitle(run)}</Link> / {short(symbol)}</div>
-      <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
           <div className="row" style={{ alignItems: 'baseline' }}>
             <h1 className="display">{short(symbol)}</h1>

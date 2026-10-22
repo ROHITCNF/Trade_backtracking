@@ -14,7 +14,7 @@ function FyersPill({ fyers }) {
     return (
       <span className="pill pill-ok">
         <span className="dot dot-profit" />
-        Fyers · Connected{fyers.clientName && <> · <b>{fyers.clientName}</b></>}
+        Fyers<span className="hide-xs"> · Connected{fyers.clientName && <> · <b>{fyers.clientName}</b></>}</span>
       </span>
     );
   }
@@ -56,7 +56,7 @@ function ApiMeter({ budget }) {
   return (
     <span className="pill" title={budget.paused ? 'Paused after a 429 until 00:00 IST' : 'Fyers data calls used today; resets 00:00 IST'}>
       <span className="caption">API</span>
-      <span className="meter">
+      <span className="meter hide-xs">
         <span className={`meter-fill meter-${level}`} style={{ width: `${pct}%` }} />
       </span>
       <span className={level === 'red' ? 'loss' : ''}>

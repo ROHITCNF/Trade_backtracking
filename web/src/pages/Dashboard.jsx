@@ -13,6 +13,7 @@ import EmptyRuns from '../components/EmptyRuns.jsx';
 import Segmented from '../components/Segmented.jsx';
 import Icon from '../components/Icon.jsx';
 import MetricCards, { Stat } from '../components/MetricCards.jsx';
+import { useNarrow } from '../lib/useMedia.js';
 
 const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
 const REASON_LABEL = { TARGET: 'Target', SL: 'Stop loss', EOD: 'End of day' };
@@ -134,8 +135,39 @@ const TICKER_COLUMNS = [
   ['worstTrade', 'Worst', (r) => r.worstTrade, pnl, true],
 ];
 
+const MOBILE_ROWS = 12;
+
+// Phones get a list instead of the 16-column table (Mobile · Dashboard.png).
+function TickerList({ rows, runId }) {
+  const navigate = useNavigate();
+  const [all, setAll] = useState(false);
+  const shown = all ? rows : rows.slice(0, MOBILE_ROWS);
+  return (
+    <section className="card" style={{ padding: 0 }}>
+      <div className="row" style={{ padding: 'var(--s-3) var(--s-4)' }}>
+        <h2 className="section spacer">Per ticker</h2><span className="caption">by P&amp;L</span>
+      </div>
+      <ul className="ticker-list">
+        {shown.map((r) => (
+          <li key={r.symbol} onClick={() => navigate(`/runs/${runId}/symbols/${encodeURIComponent(r.symbol)}`)}>
+            <span><b>{short(r.symbol)}</b><span className="cell-sub">{r.trades} trades · {Math.round(r.winRate)}% win · PF {profitFactor(r.profitFactor)}</span></span>
+            <Sparkline values={r.curve} />
+            <b className={`num ${tone(r.totalPnl)}`}>{pnl(r.totalPnl)}</b>
+          </li>
+        ))}
+      </ul>
+      {rows.length > MOBILE_ROWS && (
+        <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setAll(!all)}>
+          {all ? 'Show fewer' : `Show all ${rows.length} symbols`}
+        </button>
+      )}
+    </section>
+  );
+}
+
 function TickerTable({ rows, idle, runId }) {
   const navigate = useNavigate();
+  const narrow = useNarrow();
   const [sort, setSort] = useState(['totalPnl', -1]);
   const [q, setQ] = useState('');
   const needle = q.trim().toUpperCase();
@@ -145,6 +177,7 @@ function TickerTable({ rows, idle, runId }) {
     return [...filtered].sort((a, b) => (col[2](a) - col[2](b)) * sort[1]);
   }, [rows, sort, needle]);
   const idleShown = idle.filter((s) => !needle || s.symbol.includes(needle));
+  if (narrow) return <TickerList rows={[...rows].sort((a, b) => b.totalPnl - a.totalPnl)} runId={runId} />;
   return (
     <section className="card" style={{ padding: 0 }}>
       <div className="row" style={{ padding: 'var(--s-3) var(--s-4)' }}>
@@ -259,7 +292,7 @@ export default function Dashboard() {
   return (
     <div className="stack dashboard">
       <div className="breadcrumb"><Link to="/runs">Runs</Link> / {isLatest ? 'Latest run' : runTitle(r)}</div>
-      <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
           <div className="row"><h1 className="display">{runTitle(r)}</h1><StatusPill status={r.status} /></div>
           <p className="caption" style={{ fontSize: 13.5, margin: '4px 0 0' }}>
@@ -326,7 +359,7 @@ export default function Dashboard() {
               <div className="share-bar">
                 {b.reason.map((x) => <span key={x.key} className={`share-${x.key}`} style={{ width: `${x.share}%` }} title={`${REASON_LABEL[x.key]} ${x.share}%`} />)}
               </div>
-              <table className="data compact">
+              <div className="table-wrap"><table className="data compact">
                 <thead><tr><th>Reason</th><th className="num">Trades</th><th className="num">Share</th><th className="num">Avg R</th><th className="num">P&amp;L</th></tr></thead>
                 <tbody>
                   {b.reason.map((x) => (
@@ -338,11 +371,11 @@ export default function Dashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </section>
             <section className="card chart-card">
               <div className="row"><h2 className="section spacer">Long vs short</h2><span className="caption">same filters</span></div>
-              <table className="data compact">
+              <div className="table-wrap"><table className="data compact">
                 <thead><tr><th>Side</th><th className="num">Trades</th><th className="num">Win %</th><th className="num">Expectancy</th><th className="num">PF</th><th className="num">Avg R</th><th className="num">P&amp;L</th></tr></thead>
                 <tbody>
                   {b.side.map((x) => (
@@ -356,7 +389,7 @@ export default function Dashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </section>
           </div>
 
