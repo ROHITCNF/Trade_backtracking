@@ -20,7 +20,8 @@
     "today": "node server/today.js",
     "migrate": "node api/db/migrate.js",
     "api": "node api/server.js",
-    "hash-password": "node api/auth/hashPassword.js"
+    "hash-password": "node api/auth/hashPassword.js",
+    "web": "npm --prefix web run dev"
   },
   "engines": {
     "node": ">=18"

@@ -1,0 +1,90 @@
+/* Design-system tokens (docs/design/reference/Design system.png). Light is the
+   default; dark uses the same names (D13). Colour carries meaning only: green
+   profit, red loss, blue "you are here / you can click", amber warnings. */
+
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #edf0f4;
+  --line: #e3e6eb;
+  --line-strong: #cdd2da;
+  --ink: #14171c;
+  --ink-2: #4a5160;
+  --ink-3: #687082;
+  --muted: #8c95a6;
+  --accent: #2350b8;
+  --accent-soft: #e8eefb;
+  --profit: #0a7a4a;
+  --profit-soft: #f2f9f5;
+  --loss: #c0362c;
+  --loss-soft: #fbedeb;
+  --warn: #985700;
+  --warn-soft: #fdf6e7;
+
+  /* Categorical series for multi-run overlays; never green/red. */
+  --cat-1: #2350b8;
+  --cat-2: #c2611f;
+  --cat-3: #13817a;
+  --cat-4: #7b4fa8;
+
+  /* 4-px spacing scale; radii per component. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+  --r-control: 6px;
+  --r-input: 8px;
+  --r-card: 10px;
+  --r-pill: 999px;
+
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0f1115;
+    --surface: #171a20;
+    --surface-2: #1e222a;
+    --line: #2a2f38;
+    --line-strong: #3a404b;
+    --ink: #e8eaee;
+    --ink-2: #b3b9c4;
+    --ink-3: #8a92a0;
+    --muted: #6b7280;
+    --accent: #7fa2f5;
+    --accent-soft: #1c2740;
+    --profit: #3fbf7f;
+    --profit-soft: #13261d;
+    --loss: #f0736a;
+    --loss-soft: #2b1715;
+    --warn: #e3a548;
+    --warn-soft: #2a2112;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1115;
+  --surface: #171a20;
+  --surface-2: #1e222a;
+  --line: #2a2f38;
+  --line-strong: #3a404b;
+  --ink: #e8eaee;
+  --ink-2: #b3b9c4;
+  --ink-3: #8a92a0;
+  --muted: #6b7280;
+  --accent: #7fa2f5;
+  --accent-soft: #1c2740;
+  --profit: #3fbf7f;
+  --profit-soft: #13261d;
+  --loss: #f0736a;
+  --loss-soft: #2b1715;
+  --warn: #e3a548;
+  --warn-soft: #2a2112;
+  color-scheme: dark;
+}
