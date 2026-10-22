@@ -89,7 +89,7 @@ function RunsCompare({ data }) {
 
   return (
     <div className="stack">
-      <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
           <h1 className="display">Compare runs</h1>
           <p className="caption" style={{ fontSize: 13.5, margin: '4px 0 0' }}>
@@ -213,7 +213,7 @@ function SweepView({ data }) {
   return (
     <div className="stack">
       <div className="breadcrumb"><Link to="/compare">Compare</Link> / Sweep</div>
-      <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
           <h1 className="display">Target sweep · {sweepTitle(first).replace(/ · sweep$/, '')}</h1>
           <p className="caption" style={{ fontSize: 13.5, margin: '4px 0 0' }}>

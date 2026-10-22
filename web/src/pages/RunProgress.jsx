@@ -116,7 +116,7 @@ export default function RunProgress() {
       <div className="breadcrumb">
         <Link to="/runs">Runs</Link> / {runTitle(run)}
       </div>
-      <div className="row" style={{ alignItems: 'flex-start' }}>
+      <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
           <div className="row">
             <h1 className="display">{runTitle(run)}</h1>

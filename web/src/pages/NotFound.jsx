@@ -1,10 +1,11 @@
-// Placeholder; the screen is built in its own task (docs/plan.md, M4).
+import { Link } from 'react-router-dom';
 
 export default function NotFound() {
   return (
-    <div className="stack">
-      <h1 className="display">Page not found</h1>
-      <p className="placeholder">Coming in M4.</p>
+    <div className="card empty">
+      <h2 className="title">Page not found</h2>
+      <p>That address doesn’t match any screen. The run or watchlist may have been deleted.</p>
+      <div className="row"><Link className="btn btn-primary" to="/">Dashboard</Link><Link className="btn" to="/runs">Runs</Link></div>
     </div>
   );
 }

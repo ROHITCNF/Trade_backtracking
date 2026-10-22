@@ -92,7 +92,7 @@ export default function Runs() {
 
   return (
     <div className="stack">
-      <div className="row" style={{ alignItems: 'flex-end' }}>
+      <div className="row page-head" style={{ alignItems: 'flex-end' }}>
         <div className="spacer">
           <h1 className="display">Runs</h1>
           <p className="caption" style={{ fontSize: 13.5, margin: '4px 0 0' }}>

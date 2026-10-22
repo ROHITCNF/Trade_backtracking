@@ -1,7 +1,7 @@
 // App frame: the header (nav, status pills, logout) and any blocking-condition
 // banners over the current screen.
 
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Suspense, useState } from 'react';
 import { clearSession } from '../lib/session.js';
 import { applyTheme, readTheme } from '../lib/theme.js';
@@ -10,6 +10,8 @@ import BrandMark from './BrandMark.jsx';
 import HeaderStatus from './HeaderStatus.jsx';
 import Banners from './Banners.jsx';
 import Toast from './Toast.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
+import Icon from './Icon.jsx';
 
 const NAV = [
   ['/', 'Dashboard', true],
@@ -21,6 +23,7 @@ const NAV = [
 
 export default function Shell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [theme, setTheme] = useState(readTheme);
 
   const toggleTheme = () => {
@@ -53,16 +56,19 @@ export default function Shell() {
           <button className="btn btn-ghost hide-sm" onClick={toggleTheme} aria-label="Toggle dark theme">
             {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
-          <button className="btn" onClick={logout}>
-            Log out
+          <button className="btn" onClick={logout} aria-label="Log out">
+            <span className="hide-xs">Log out</span>
+            <span className="show-xs"><Icon name="logout" /></span>
           </button>
         </div>
       </header>
       <main className="page">
         <Banners />
-        <Suspense fallback={<p className="placeholder">Loading…</p>}>
-          <Outlet />
-        </Suspense>
+        <ErrorBoundary resetKey={location.pathname}>
+          <Suspense fallback={<p className="placeholder">Loading…</p>}>
+            <Outlet />
+          </Suspense>
+        </ErrorBoundary>
       </main>
       <Toast />
     </MeProvider>
