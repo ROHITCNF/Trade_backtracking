@@ -8,12 +8,14 @@ const { loadConfig } = require('./config');
 const { errorHandler, notFoundHandler } = require('./errors');
 const { authRoutes } = require('./routes/auth');
 const { fyersRoutes } = require('./routes/fyers');
+const { symbolRoutes } = require('./routes/symbols');
 
 // Builds the app without listening, so tests can drive it with app.inject().
-function buildApp({ pool, config, worker = null, logger = false, loginLimiter, newFyersClient }) {
+function buildApp({ pool, config, worker = null, symbols = null, logger = false, loginLimiter, newFyersClient }) {
   const app = Fastify({ logger, trustProxy: config.production });
   app.decorate('db', pool);
   app.decorate('worker', worker);
+  app.decorate('symbols', symbols);
   app.setErrorHandler(errorHandler);
   app.setNotFoundHandler(notFoundHandler);
 
@@ -21,6 +23,7 @@ function buildApp({ pool, config, worker = null, logger = false, loginLimiter, n
   app.register(cors, { origin: config.frontendUrl, methods: ['GET', 'POST', 'PATCH', 'DELETE'] });
   app.register(authRoutes, { config, limiter: loginLimiter });
   app.register(fyersRoutes, { config, newClient: newFyersClient });
+  if (symbols) app.register(symbolRoutes, { symbols });
 
   // Liveness for Render: up, and the database answers.
   app.get('/api/health', async (request, reply) => {
@@ -44,13 +47,16 @@ async function start() {
   const { createPgStore } = require('./db/fyersStore');
   const { setStore } = require('../src/fyers');
   const { createWorker } = require('./worker');
+  const { createSymbolMaster } = require('./symbols');
 
   const pool = getPool();
   await migrate(pool);
   setStore(createPgStore(pool));
 
   const worker = createWorker({ pool });
-  const app = buildApp({ pool, config, worker, logger: true });
+  const symbols = createSymbolMaster();
+  symbols.start(); // not awaited: boot does not wait on Fyers' file server
+  const app = buildApp({ pool, config, worker, symbols, logger: true });
   await app.listen({ port: config.port, host: config.host });
   worker.wake();
   return app;
