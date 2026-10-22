@@ -87,3 +87,29 @@ export function tone(n) {
   if (!isNum(n) || Math.round(n * 100) === 0) return 'flat';
   return n > 0 ? 'profit' : 'loss';
 }
+
+const IST_MS = 5.5 * 3600 * 1000;
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// ISO timestamp -> '14:07' or '14:07:42' in IST.
+export function istTime(iso, withSeconds = false) {
+  if (!iso) return DASH;
+  const d = new Date(new Date(iso).getTime() + IST_MS);
+  return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}${withSeconds ? `:${pad2(d.getUTCSeconds())}` : ''}`;
+}
+
+// ISO timestamp -> '21 Oct 2026, 18:42' in IST.
+export function istDateTime(iso) {
+  if (!iso) return DASH;
+  const d = new Date(new Date(iso).getTime() + IST_MS);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${istTime(iso)}`;
+}
+
+// 347 s -> '5m 47s'; 4000 s -> '1h 6m'.
+export function duration(seconds) {
+  if (!isNum(seconds) || seconds < 0) return DASH;
+  const s = Math.round(seconds);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${pad2(s % 60)}s`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}

@@ -14,6 +14,7 @@ import Segmented from '../components/Segmented.jsx';
 import Toggle from '../components/Toggle.jsx';
 import SymbolSearch from '../components/SymbolSearch.jsx';
 import Icon from '../components/Icon.jsx';
+import { settingsLabel, stopLabel } from '../lib/runs.js';
 
 const SWEEP_VARIANTS = 9; // src/targets.js
 const STOP_HINTS = {
@@ -54,9 +55,6 @@ function toDraft(form) {
   };
 }
 
-const stopLabel = (c) => `SL ${c.slMode === 'range' ? 'range' : `${c.slMode} ${c.slPct}%`}`;
-const targetLabel = (c) => (c.targetMode === 'none' ? 'no target' : c.targetMode === 'R' ? `TGT ${c.targetR}R` : `TGT ${c.targetPct}%`);
-export const settingsLabel = (c) => `${DIRECTION[c.direction]} · ${stopLabel(c)} · ${targetLabel(c)}`;
 
 function useInitialForm(params) {
   const [form, setForm] = useState(null);
