@@ -9,7 +9,7 @@ live runner. A deployed web dashboard is being added — see [docs/](docs/).
 |---|---|
 | Backtest engine + CLI reports | working |
 | Paper live runner (`server/`) | working, places no orders |
-| Web app (v1) | designed — [intent](docs/intent.md) · [spec](docs/spec.md) · [hld](docs/hld.md) |
+| Web app (v1) | designed — [intent](docs/intent.md) · [spec](docs/spec.md) · [hld](docs/hld.md) · [decisions](docs/decisions.md) · [screens](docs/design/reference/) |
 
 ## Strategy in one paragraph
 
@@ -60,7 +60,7 @@ src/             engine (pure), metrics, Fyers fetch + throttle, reports
 server/          live paper runner — see server/architecture.md
 lists/           watchlists: core (39), final (17), fno (207)
 research/        parked strategy research (EMA20/VWAP)
-docs/            web app intent, spec, high-level design
+docs/            web app intent, spec, high-level design, decisions, design references
 ```
 
 More detail for contributors is in [CLAUDE.md](CLAUDE.md).

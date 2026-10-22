@@ -1,13 +1,19 @@
 # Spec — v1 web app
 
 > Status: **frozen** for v1 (2026-10-22). Change only by deliberate revision.
+> Revision v1.1 (2026-10-22): watchlists, charts and the design review — see
+> [decisions.md](decisions.md).
 
 What v1 is. Why: [intent.md](intent.md). How: [hld.md](hld.md).
 
 ## Scope
 
 **In v1:** app login, Fyers connect, backtest launcher, run progress, run history, run
-dashboard, ticker detail, trade detail chart, run comparison, target sweep.
+dashboard, ticker detail, trade detail chart, run comparison, target sweep, watchlists
+with `.txt` import/export.
+
+**UI source of truth:** the screens in [design/reference/](design/reference/). Where they
+disagree with this spec, [decisions.md](decisions.md) says which one wins.
 
 **Not in v1:** live runner / paper view, order placement, candle storage, multiple users,
 non-ORB strategies, Fyers Prime-only features.
@@ -18,7 +24,7 @@ non-ORB strategies, Fyers Prime-only features.
 |---|---|
 | Run | One backtest job: a settings snapshot, a date range, a symbol set, and its results |
 | Settings | The strategy knobs from `config.js` (direction, stop, target, sizing, ORB window, session end, costs) |
-| List | A named watchlist from `lists/` — `core` (39), `final` (17), `fno` (207) |
+| Watchlist | A named, editable symbol list stored in the app; seeded from `lists/` — `core` (39), `final` (17), `fno` (207, read-only) |
 | Sweep | A group of runs on the same symbols and dates that differ only in target rule |
 | R | P&L as a multiple of the risk taken (entry-to-stop distance × qty) |
 | Data budget | Fyers Standard plan Data API cap: 50/min, 5,000/day; the app stops at 4,800 |
@@ -43,7 +49,7 @@ non-ORB strategies, Fyers Prime-only features.
    dashboard.
 3. Owner opens the app → login screen.
 
-### F2. Log in to the app (≈ every 30 days)
+### F2. Log in to the app (≈ every 7 days)
 
 1. Open app → no valid session → login screen.
 2. Enter password → submit.
@@ -61,14 +67,15 @@ non-ORB strategies, Fyers Prime-only features.
 
 ### F4. Run a backtest
 
-1. **New backtest** → form prefilled with the defaults from `config.js`.
-2. Choose date range, then symbols (a list, or a searchable multi-select), then adjust
+1. **New backtest** → form prefilled with the latest run's settings (`config.js` defaults
+   when there are no runs).
+2. Choose date range, then symbols (a watchlist, or a searchable multi-select), then adjust
    settings.
 3. The form shows a live estimate: calls, approximate duration, share of today's remaining
    budget.
 4. **Start** → run queued → Run progress screen.
 5. Progress shows the current symbol, done/total, elapsed/ETA and a per-symbol log
-   (trades and P&L, or skipped with reason).
+   (trades and P&L, or skipped / failed with reason).
 6. On completion → Run dashboard. The owner may leave mid-run; the run keeps going and the
    Runs list shows its status.
 
@@ -101,7 +108,33 @@ per run, overlaid equity curves and per-symbol results per run.
 ### F9. Manage runs
 
 From Runs list: rename, duplicate as a new run (opens the form prefilled), cancel a queued
-or running run, delete a finished run (with confirmation; deletes its trades).
+or running run, resume a failed run, delete a finished run (with confirmation; deletes its
+trades).
+
+### F10. Manage watchlists
+
+Watchlists screen → list of watchlists on the left (name, source, symbol count) → select
+one → its symbols with company name, the latest run's trades / win % / P&L for each
+symbol, and the date added. From there:
+
+- **New** watchlist (name, optional description).
+- **Add a symbol** through the same search as the launcher.
+- **Remove** a symbol.
+- **Backtest this list** → New backtest with this watchlist selected.
+- **Export .txt** → one `NSE:XXX-EQ` per line.
+- **Delete** the watchlist, with confirmation. Past runs keep their own symbol snapshot.
+
+The F&O watchlist is read-only: no add, remove, import or delete.
+
+### F11. Import a .txt
+
+1. **Import .txt** on a watchlist → pick a file (one symbol per line or comma-separated;
+   `PAYTM` or `NSE:PAYTM-EQ`).
+2. Preview: counts of **will be added**, **already in list** and **not recognised**; chips
+   for the symbols; skipped lines listed with line number and reason (not found, or an
+   index rather than a stock).
+3. Choose **Add to this list**, **Replace list** or **New watchlist** → confirm.
+   Nothing is saved before confirming.
 
 ## Functional requirements
 
@@ -111,7 +144,7 @@ or running run, delete a finished run (with confirmation; deletes its trades).
   reset flow (reset = change the env var).
 - **FR-2** Every API route except `/api/login`, `/api/health` and the Fyers callback requires
   a valid session. Invalid or expired session → 401 → login screen.
-- **FR-3** Sessions last 30 days. Logout ends the session in this browser.
+- **FR-3** Sessions last 7 days. Logout ends the session in this browser.
 - **FR-4** Repeated failed logins are slowed (e.g. 5 attempts per 15 min per IP).
 
 ### Fyers connection
@@ -122,11 +155,12 @@ or running run, delete a finished run (with confirmation; deletes its trades).
   it was issued) and treated as invalid after it.
 - **FR-7** The header shows connection status and the Fyers client name (from Profile).
 - **FR-8** The header shows data budget used today (`count / 4,800`) and a paused state
-  after a 429.
+  after a 429. Both reset at 00:00 IST.
 
 ### Launcher
 
-- **FR-9** Inputs: from/to date; symbols (list or explicit set, at least 1); direction; ORB
+- **FR-9** Inputs: from/to date (with 1Y / 6M / 3M / 1M shortcuts); symbols (a watchlist or
+  an explicit set, at least 1); direction; ORB
   start/end; session end; stop mode and SL %; target mode and R or %; sizing mode with
   capital, leverage or fixed qty; cost bps; sweep toggle; optional run name.
 - **FR-10** Validation: from ≤ to; from ≥ today − 1 year; to ≤ today; ORB start < ORB end <
@@ -142,12 +176,15 @@ or running run, delete a finished run (with confirmation; deletes its trades).
   past runs.
 - **FR-14** Status lifecycle: `queued → running → done | failed | cancelled`.
 - **FR-15** Runs execute one at a time, in order of creation.
-- **FR-16** A symbol whose fetch fails, or that produces no trades, is recorded as skipped
-  with a reason; the run continues.
+- **FR-16** A symbol that produces no trades is recorded as `skipped`; one whose fetch still
+  fails after retries is recorded as `failed`. Both carry a reason, and the run continues.
+  Transient errors (timeout, network, HTTP 5xx) retry twice; a 429 never retries.
 - **FR-17** A run interrupted by a server restart resumes from its first unfinished symbol.
+  A failed run can be resumed by hand (e.g. the next day after a budget stop).
 - **FR-18** Results for a symbol (trades and per-symbol stats) are saved as soon as that
   symbol finishes.
 - **FR-19** Cancel stops the run after the current symbol; finished symbols are kept.
+- **FR-19a** A run records the Fyers calls it used and when each symbol finished.
 
 ### Dashboard and analysis
 
@@ -176,12 +213,44 @@ or running run, delete a finished run (with confirmation; deletes its trades).
   range as a band, lines for entry, SL and target, and entry/exit markers.
 - **FR-29** Candles are fetched from Fyers on demand (1 call) and not persisted.
 
+### Charts
+
+- **FR-28a** The trade candle chart uses TradingView Lightweight Charts v5. Every other chart
+  (equity + drawdown, bar breakdowns, histogram, exit split, sparklines, compare and sweep
+  overlays) uses Apache ECharts.
+
 ### Compare
 
 - **FR-30** Compare 2–4 runs: settings diff, stats per run, overlaid equity curves,
   per-symbol P&L per run.
 - **FR-31** Sweep view: one row per target rule — trades, win %, P&L, expectancy, avg R,
-  PF, max DD, exits — with best expectancy highlighted and a small-sample note.
+  PF, max DD, exits — with best expectancy highlighted and a small-sample note. The note
+  that % targets equal R targets appears only when the stop mode is `pct`.
+
+### Watchlists
+
+- **FR-32** Watchlists are stored in the app, seeded once from `lists/*.txt`. The F&O
+  watchlist is read-only.
+- **FR-33** Create, rename, delete a watchlist; add and remove symbols. Symbols are
+  validated against the Fyers NSE symbol master and stored as `NSE:XXX-EQ`; duplicates
+  are ignored.
+- **FR-34** `.txt` import accepts one symbol per line or comma-separated, bare (`PAYTM`) or
+  full (`NSE:PAYTM-EQ`). A preview shows will-be-added, already-in-list and not-recognised
+  counts, with skipped lines by line number and reason. Modes: add, replace, new watchlist.
+  Nothing is written until confirmed. Max 500 lines per file.
+- **FR-35** Export writes one full symbol per line.
+- **FR-36** Each watchlist symbol shows trades, win % and P&L from the latest finished run
+  that included it, or "not in run".
+- **FR-37** Runs snapshot their symbols. Editing or deleting a watchlist never changes past
+  runs.
+
+### Header and display
+
+- **FR-38** The market pill (NSE Open / Closed) is computed from the clock — Mon–Fri,
+  09:15–15:30 IST — and never calls Fyers. Holidays are ignored in v1.
+- **FR-39** Profit factor with no losing P&L is shown as `∞`. Signed P&L always carries a
+  sign; ₹ uses Indian digit grouping (see the design system reference).
+- **FR-40** Light theme by default; dark theme from the same tokens.
 
 ## Non-functional requirements
 
@@ -265,4 +334,3 @@ not show up in the UI, and keep `data/token.json` and `data/rest-usage.json`.
 1. Does a new token for one Fyers app invalidate another app's token for the same account?
    Fyers does not document it. Verify once: log in locally, connect on the server, then make
    a call with the local token.
-2. Watchlists: stay as read-only files in `lists/` for v1, or become editable in the UI?
