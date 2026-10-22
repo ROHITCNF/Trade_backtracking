@@ -41,6 +41,8 @@ test('analysis numbers are computeMetrics / rowFor / totalsFrom on the filtered 
     assert.ok(view.length > 0, JSON.stringify(filters));
     assert.deepEqual(a.metrics, computeMetrics(view), JSON.stringify(filters));
     assert.equal(a.count, view.length);
+    assert.equal(a.extremes.best.pnl, a.metrics.bestTrade);
+    assert.equal(a.extremes.worst.pnl, a.metrics.worstTrade);
 
     const groups = Object.groupBy(view, (t) => t.symbol);
     for (const row of a.symbols) {

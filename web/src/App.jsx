@@ -1,20 +1,23 @@
 // Routes for every screen in docs/design/reference/. Everything but /login sits
 // behind a session; an expired one (any 401) lands back on /login.
 
-import { useEffect } from 'react';
+import { lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { setUnauthorizedHandler } from './lib/api.js';
 import { readSession } from './lib/session.js';
 import Shell from './components/Shell.jsx';
 import Login from './pages/Login.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import NewBacktest from './pages/NewBacktest.jsx';
-import RunProgress from './pages/RunProgress.jsx';
-import Runs from './pages/Runs.jsx';
-import TickerDetail from './pages/TickerDetail.jsx';
-import Compare from './pages/Compare.jsx';
-import Watchlists from './pages/Watchlists.jsx';
-import NotFound from './pages/NotFound.jsx';
+
+// Screens load on demand: charts (ECharts, Lightweight Charts) stay out of the
+// first download, so login and the shell appear fast.
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const NewBacktest = lazy(() => import('./pages/NewBacktest.jsx'));
+const RunProgress = lazy(() => import('./pages/RunProgress.jsx'));
+const Runs = lazy(() => import('./pages/Runs.jsx'));
+const TickerDetail = lazy(() => import('./pages/TickerDetail.jsx'));
+const Compare = lazy(() => import('./pages/Compare.jsx'));
+const Watchlists = lazy(() => import('./pages/Watchlists.jsx'));
+const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 function RequireSession({ children }) {
   const location = useLocation();

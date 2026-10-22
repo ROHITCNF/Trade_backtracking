@@ -117,12 +117,16 @@ function analyse(trades, { config, filters = {}, symbolStatus = {}, nameOf = () 
   rows.sort((a, b) => b.totalPnl - a.totalPnl);
 
   const portfolio = rows.length ? totalsFrom(view, rows) : null;
+  // Which trade the best/worst stat cards mean (computeMetrics gives only P&L).
+  const pickTrade = (better) => view.reduce((a, t) => (a === null || better(t.pnl, a.pnl) ? t : a), null);
+  const brief = (t) => t && { id: t.id, symbol: t.symbol, date: t.date, pnl: t.pnl };
   return {
     filters,
     count: view.length,
     totalCount: trades.length,
     metrics: computeMetrics(view),
     portfolio: portfolio && { ...portfolio, symbolsTraded: rows.length, symbols: symbolStatus },
+    extremes: { best: brief(pickTrade((x, y) => x > y)), worst: brief(pickTrade((x, y) => x < y)) },
     breakdowns: breakdowns(view, config),
     symbols: rows,
     warnings: {
