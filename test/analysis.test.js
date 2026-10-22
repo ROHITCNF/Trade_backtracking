@@ -159,7 +159,8 @@ test('compare runs by id or a whole sweep, with a settings diff', { skip: noDb }
     assert.deepEqual(res.settingsDiff, [{ key: 'slMode', values: ['tighter', 'range'] }, { key: 'costBps', values: [5, 0] }]);
     const stored = await loadTrades(pool, a);
     assert.deepEqual(res.runs[0].metrics, computeMetrics(stored));
-    assert.equal(sum(Object.values(res.runs[0].bySymbol)), computeMetrics(stored).totalPnl);
+    assert.equal(sum(Object.values(res.runs[0].bySymbol).map((r) => r.pnl)), computeMetrics(stored).totalPnl);
+    assert.equal(Object.values(res.runs[0].bySymbol).reduce((n, r) => n + r.trades, 0), stored.length);
 
     const sweep = (await get(`/api/compare?sweep=${sweepIds[0]}`)).json();
     assert.equal(sweep.runs.length, TARGET_VARIANTS.length);
