@@ -2,7 +2,7 @@
 // banners over the current screen.
 
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { clearSession } from '../lib/session.js';
 import { applyTheme, readTheme } from '../lib/theme.js';
 import { MeProvider } from '../lib/me.jsx';
@@ -60,7 +60,9 @@ export default function Shell() {
       </header>
       <main className="page">
         <Banners />
-        <Outlet />
+        <Suspense fallback={<p className="placeholder">Loading…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
       <Toast />
     </MeProvider>
