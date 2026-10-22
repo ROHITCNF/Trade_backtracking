@@ -17,6 +17,7 @@ npm run today                # print today's live decision log
 npm test                     # node --test over test/*.test.js
 npm run api                  # web API + run worker (api/), needs DATABASE_URL
 npm run migrate              # apply api/db/migrations to DATABASE_URL
+npm run web                  # React frontend (web/, Vite) on :5173; `npm --prefix web test` for its tests
 ```
 
 `runAll.js` and `summary.js` demand an explicit count (`5`, `all`) and take an optional list name

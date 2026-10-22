@@ -45,6 +45,8 @@ echo "SESSION_SECRET=$(openssl rand -hex 32)" >> .env
 echo "APP_PASSWORD_HASH=$(npm run -s hash-password)" >> .env   # prompts for the app password
 npm run migrate              # applies api/db/migrations/*.sql; rerunning is a no-op
 npm run api                  # web API + run worker on :4000; migrates on boot
+npm --prefix web install     # once
+npm run web                  # frontend on :5173, proxying /api to :4000
 ```
 
 The migration test runs only with a server to point it at; it creates and drops its own
