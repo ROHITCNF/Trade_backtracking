@@ -115,5 +115,5 @@ version in sync with the `addCandlestickSeries` / `addAreaSeries` calls in the t
 
 `FYERS_APP_ID`, `FYERS_SECRET_ID` and `FYERS_REDIRECT_URI` live in `.env` (gitignored, loaded by
 `src/env.js`; see `.env.example`). `npm run login` exchanges them for an access token saved to
-`data/token.json`, valid until the end of the IST day. "No Fyers token for today" means run it
+`data/token.json`, valid until Fyers expires it at 06:30 IST the next morning. "No Fyers token for today" means run it
 again. Never paste credentials or tokens into tracked source files.

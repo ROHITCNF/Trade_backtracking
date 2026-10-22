@@ -31,4 +31,15 @@ function istToday() {
   return istParts(Math.floor(Date.now() / 1000)).date;
 }
 
-module.exports = { IST_OFFSET_SECONDS, toMinutes, istParts, dateToEpoch, istToday };
+// Fyers access tokens die every day at 06:30 IST. Given when a token was issued
+// (epoch ms), returns the epoch ms of the first 06:30 IST strictly after it.
+const FYERS_EXPIRY_MINUTE = toMinutes('06:30');
+function fyersTokenExpiry(issuedMs) {
+  const DAY = 86400000;
+  const shifted = issuedMs + IST_OFFSET_SECONDS * 1000;
+  let expiry = Math.floor(shifted / DAY) * DAY + FYERS_EXPIRY_MINUTE * 60000;
+  if (expiry <= shifted) expiry += DAY;
+  return expiry - IST_OFFSET_SECONDS * 1000;
+}
+
+module.exports = { IST_OFFSET_SECONDS, toMinutes, istParts, dateToEpoch, istToday, fyersTokenExpiry };

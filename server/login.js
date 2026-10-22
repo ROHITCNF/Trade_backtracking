@@ -9,7 +9,6 @@ require('../src/env').loadEnv();
 
 const http = require('http');
 const { newClient, saveToken, readToken } = require('../src/fyers');
-const { istToday } = require('../src/time');
 
 function waitForAuthCode(redirectUri) {
   const url = new URL(redirectUri);
@@ -37,8 +36,8 @@ function waitForAuthCode(redirectUri) {
 }
 
 async function main() {
-  if (readToken()) {
-    console.log(`Already have a token for ${istToday()}. Nothing to do.`);
+  if (await readToken()) {
+    console.log('Already have a live token (Fyers expires it at 06:30 IST). Nothing to do.');
     return;
   }
 
@@ -57,11 +56,11 @@ async function main() {
   });
   if (res.s !== 'ok') throw new Error(`Token exchange failed: ${JSON.stringify(res)}`);
 
-  saveToken(res.access_token);
+  await saveToken(res.access_token);
   fyers.setAccessToken(res.access_token);
 
   const profile = await fyers.get_profile();
-  console.log(`\nLogged in as ${profile.data?.name ?? '(name unavailable)'} — token saved for ${istToday()}.\n`);
+  console.log(`\nLogged in as ${profile.data?.name ?? '(name unavailable)'} — token saved until 06:30 IST tomorrow.\n`);
 }
 
 main().catch((err) => { console.error('\n' + err.message + '\n'); process.exit(1); });
