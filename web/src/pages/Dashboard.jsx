@@ -12,6 +12,7 @@ import StatusPill from '../components/StatusPill.jsx';
 import EmptyRuns from '../components/EmptyRuns.jsx';
 import Segmented from '../components/Segmented.jsx';
 import Icon from '../components/Icon.jsx';
+import MetricCards, { Stat } from '../components/MetricCards.jsx';
 
 const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
 const REASON_LABEL = { TARGET: 'Target', SL: 'Stop loss', EOD: 'End of day' };
@@ -65,16 +66,6 @@ async function downloadCsv(runId, query) {
   const a = Object.assign(document.createElement('a'), { href: url, download: `run-${runId}-trades.csv` });
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function Stat({ label, value, sub, className = '' }) {
-  return (
-    <div className="stat-card">
-      <span className="label">{label}</span>
-      <span className={`stat ${className}`}>{value}</span>
-      {sub && <span className="caption">{sub}</span>}
-    </div>
-  );
 }
 
 function SettingsStrip({ run }) {
@@ -260,12 +251,10 @@ export default function Dashboard() {
   const p = analysis.portfolio;
   const b = analysis.breakdowns;
   const isLatest = !routeId;
-  const breakEven = m.avgWin > 0 ? (Math.abs(m.avgLoss) / (m.avgWin + Math.abs(m.avgLoss))) * 100 : null;
   const ranFor = r.startedAt && r.finishedAt ? (new Date(r.finishedAt) - new Date(r.startedAt)) / 1000 : null;
   const tradedIds = new Set(analysis.symbols.map((s) => s.symbol));
   const idle = run.symbols.filter((s) => s.status !== 'done' && !tradedIds.has(s.symbol));
   const filtered = Boolean(query);
-  const reasons = Object.fromEntries(b.reason.map((x) => [x.key, x]));
 
   return (
     <div className="stack dashboard">
@@ -298,20 +287,7 @@ export default function Dashboard() {
             <div className="banner banner-row"><Icon name="warn" /><span><b>Small sample — {analysis.count} trades.</b> <span className="warn">Under 30 trades, these numbers move a lot with each new trade. Widen the range or symbols before trusting them.</span></span></div>
           )}
 
-          <div className="stat-grid">
-            <Stat label="Trades" value={qty(m.totalTrades)} sub={`${m.wins} won · ${m.losses} lost`} />
-            <Stat label="Win rate" value={rate(m.winRate)} sub={breakEven === null ? null : `break-even ≈ ${breakEven.toFixed(0)}% at these win/loss sizes`} />
-            <Stat label="Total P&L" value={pnl(m.totalPnl)} className={tone(m.totalPnl)} sub={filtered ? 'filtered view, net of costs' : 'net of costs'} />
-            <Stat label="Expectancy / trade" value={pnl(m.expectancy)} className={tone(m.expectancy)} sub={`${rMultiple(m.avgR)} per trade`} />
-            <Stat label="Profit factor" value={profitFactor(m.profitFactor)} sub="gross win ÷ gross loss" />
-            <Stat label="Avg R" value={rMultiple(m.avgR)} className={tone(m.avgR)} sub="net, after costs" />
-            <Stat label="Avg win" value={pnl(m.avgWin)} className={tone(m.avgWin)} sub="per winning trade" />
-            <Stat label="Avg loss" value={pnl(m.avgLoss)} className={tone(m.avgLoss)} sub="per losing trade" />
-            <Stat label="Max drawdown" value={pnl(-m.maxDrawdown)} className={tone(-m.maxDrawdown)} sub="peak to trough, closed P&L" />
-            <Stat label="Best trade" value={pnl(m.bestTrade)} className={tone(m.bestTrade)} sub={analysis.extremes?.best && `${short(analysis.extremes?.best.symbol)} · ${dateShort(analysis.extremes?.best.date)}`} />
-            <Stat label="Worst trade" value={pnl(m.worstTrade)} className={tone(m.worstTrade)} sub={analysis.extremes?.worst && `${short(analysis.extremes?.worst.symbol)} · ${dateShort(analysis.extremes?.worst.date)}`} />
-            <Stat label="Exits" value={`${qty(reasons.SL.trades)} / ${qty(reasons.TARGET.trades)} / ${qty(reasons.EOD.trades)}`} sub="SL / Target / EOD" />
-          </div>
+          <MetricCards analysis={analysis} filtered={filtered} />
 
           {p && (
             <div className="portfolio-grid">
