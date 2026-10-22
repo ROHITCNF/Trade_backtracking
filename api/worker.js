@@ -14,6 +14,7 @@ const { runBacktest } = require('../src/engine');
 const { computeMetrics } = require('../src/metrics');
 const { rowFor, totalsFrom } = require('../src/portfolio');
 const { withTransaction } = require('./db/pool');
+const { insertTrades, loadTrades } = require('./db/trades');
 
 // Errors that every later symbol would hit too: spent budget, a 429 pause, a
 // dead token. These fail the whole run instead of one symbol (FR-16, D8); the
@@ -28,37 +29,6 @@ function summaryOf(trades) {
   const { curve, ...rest } = computeMetrics(trades);
   return rest;
 }
-
-const TRADE_COLUMNS = `date date, side text, "orbHigh" numeric, "orbLow" numeric, "entryTime" text,
-  "entryTs" bigint, entry numeric, sl numeric, target numeric, "exitTime" text, "exitTs" bigint,
-  exit numeric, reason text, quantity int, notional numeric, pnl numeric, "pnlPct" numeric,
-  "rMultiple" numeric`;
-
-async function insertTrades(client, runId, symbol, trades) {
-  if (!trades.length) return;
-  const rows = trades.map(({ candles, ...t }) => t);
-  await client.query(
-    `insert into trades (run_id, symbol, date, side, orb_high, orb_low, entry_time, entry_ts, entry, sl,
-       target, exit_time, exit_ts, exit, reason, quantity, notional, pnl, pnl_pct, r_multiple)
-     select $1, $2, date, side, "orbHigh", "orbLow", "entryTime", "entryTs", entry, sl, target, "exitTime",
-       "exitTs", exit, reason, quantity, notional, pnl, "pnlPct", "rMultiple"
-     from jsonb_to_recordset($3::jsonb) as t(${TRADE_COLUMNS})`,
-    [runId, symbol, JSON.stringify(rows)]
-  );
-}
-
-// A trades row back into the object runBacktest produced (minus candles).
-const NUMERIC = ['orbHigh', 'orbLow', 'entryTs', 'entry', 'sl', 'target', 'exitTs', 'exit', 'notional', 'pnl', 'pnlPct', 'rMultiple'];
-function rowToTrade(row) {
-  const t = { ...row };
-  for (const k of NUMERIC) if (t[k] !== null) t[k] = Number(t[k]);
-  return t;
-}
-
-const SELECT_TRADES = `select symbol, date::text as date, side, orb_high as "orbHigh", orb_low as "orbLow",
-  entry_time as "entryTime", entry_ts as "entryTs", entry, sl, target, exit_time as "exitTime",
-  exit_ts as "exitTs", exit, reason, quantity, notional, pnl, pnl_pct as "pnlPct", r_multiple as "rMultiple"
-  from trades where run_id = $1 order by entry_ts, symbol`;
 
 function createWorker({ pool, getCandles = fetchCandles, log = console.log }) {
   // Records one symbol's outcome for one run, all in one transaction.
@@ -75,8 +45,7 @@ function createWorker({ pool, getCandles = fetchCandles, log = console.log }) {
   }
 
   async function finishRun(run) {
-    const { rows } = await pool.query(SELECT_TRADES, [run.id]);
-    const trades = rows.map(rowToTrade);
+    const trades = await loadTrades(pool, run.id);
     const bySymbol = new Map();
     for (const t of trades) bySymbol.set(t.symbol, [...(bySymbol.get(t.symbol) || []), t]);
     const symbolRows = [...bySymbol].map(([symbol, ts]) => rowFor(symbol, ts, computeMetrics(ts)));

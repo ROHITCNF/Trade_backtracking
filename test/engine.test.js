@@ -130,3 +130,8 @@ test('metrics: profit factor is null when nothing lost', () => {
   assert.equal(m.profitFactor, null);
   assert.equal(m.curve.length, 1);
 });
+
+test('round never returns -0', () => {
+  assert.ok(Object.is(round(-0.001), 0));
+  assert.equal(round(-1.234), -1.23);
+});
