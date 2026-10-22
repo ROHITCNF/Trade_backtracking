@@ -1,10 +1,15 @@
-// App frame: the header (nav, status pills, logout) over the current screen.
-// The pills themselves arrive with the header work (#30).
+// App frame: the header (nav, status pills, logout) and any blocking-condition
+// banners over the current screen.
 
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { clearSession } from '../lib/session.js';
 import { applyTheme, readTheme } from '../lib/theme.js';
+import { MeProvider } from '../lib/me.jsx';
+import BrandMark from './BrandMark.jsx';
+import HeaderStatus from './HeaderStatus.jsx';
+import Banners from './Banners.jsx';
+import Toast from './Toast.jsx';
 
 const NAV = [
   ['/', 'Dashboard', true],
@@ -29,11 +34,11 @@ export default function Shell() {
   };
 
   return (
-    <>
+    <MeProvider>
       <header className="header">
         <div className="header-inner">
           <NavLink to="/" className="brand">
-            <span className="brand-mark" aria-hidden="true" />
+            <BrandMark />
             ORB Lab
           </NavLink>
           <nav className="nav">
@@ -44,18 +49,20 @@ export default function Shell() {
             ))}
           </nav>
           <div className="spacer" />
-          <div className="header-status" />
-          <button className="btn btn-ghost" onClick={toggleTheme} aria-label="Toggle dark theme">
+          <HeaderStatus />
+          <button className="btn btn-ghost hide-sm" onClick={toggleTheme} aria-label="Toggle dark theme">
             {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
-          <button className="btn btn-ghost" onClick={logout}>
+          <button className="btn" onClick={logout}>
             Log out
           </button>
         </div>
       </header>
       <main className="page">
+        <Banners />
         <Outlet />
       </main>
-    </>
+      <Toast />
+    </MeProvider>
   );
 }
