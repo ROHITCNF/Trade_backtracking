@@ -17,12 +17,14 @@
     "core": "node summary.js all core.txt",
     "login": "node server/login.js",
     "live": "node server/live.js",
-    "today": "node server/today.js"
+    "today": "node server/today.js",
+    "migrate": "node api/db/migrate.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "fyers-api-v3": "^2.3.0"
+    "fyers-api-v3": "^2.3.0",
+    "pg": "^8.23.1"
   }
 }

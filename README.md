@@ -31,6 +31,22 @@ cp .env.example .env      # fill FYERS_APP_ID, FYERS_SECRET_ID, FYERS_REDIRECT_U
 npm run login             # once per trading day; saves data/token.json
 ```
 
+### Local database (web app only)
+
+The CLI never touches a database. The web app's API (`api/`) needs Postgres; locally that is
+Homebrew's:
+
+```bash
+brew install postgresql@17
+brew services start postgresql@17
+/opt/homebrew/opt/postgresql@17/bin/createdb backtest
+echo 'DATABASE_URL=postgres://localhost/backtest' >> .env
+npm run migrate              # applies api/db/migrations/*.sql; rerunning is a no-op
+```
+
+The migration test runs only with a server to point it at; it creates and drops its own
+database: `TEST_DATABASE_URL=postgres://localhost/postgres npm test`.
+
 ## Usage
 
 ```bash
