@@ -87,9 +87,13 @@ async function analysisRoutes(app, { getCandles = fetchCandles }) {
       for (const id of ids) {
         const run = await runOf(id);
         const trades = await loadTrades(db, id);
-        const bySymbol = {};
-        for (const t of trades) bySymbol[t.symbol] = (bySymbol[t.symbol] || 0) + t.pnl;
-        for (const s in bySymbol) bySymbol[s] = Math.round(bySymbol[s] * 100) / 100;
+        const bySymbol = {}; // symbol -> { pnl, trades }
+        for (const t of trades) {
+          const row = (bySymbol[t.symbol] ||= { pnl: 0, trades: 0 });
+          row.pnl += t.pnl;
+          row.trades++;
+        }
+        for (const row of Object.values(bySymbol)) row.pnl = Math.round(row.pnl * 100) / 100;
         runs.push({ run, metrics: computeMetrics(trades), bySymbol });
       }
 

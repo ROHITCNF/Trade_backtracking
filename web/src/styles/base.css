@@ -241,3 +241,22 @@ tr.clickable { cursor: pointer; }
   .num-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .trade-table td, .trade-table th { white-space: nowrap; }
+
+/* Compare and sweep */
+.run-chip { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--r-pill); color: var(--ink); font-weight: 600; background: var(--surface); }
+.run-chip:hover { text-decoration: none; background: var(--surface-2); }
+.run-chip i, .key-sq { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
+.key-line { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; }
+.diff-chip { background: var(--warn-soft); padding: 2px 8px; border-radius: var(--r-control); font-weight: 600; }
+.compare-cols { display: grid; gap: var(--s-3); }
+.compare-col { padding: 0; border-top: 3px solid; overflow: hidden; }
+.metric-row { display: flex; justify-content: space-between; gap: var(--s-2); padding: 7px var(--s-4); border-top: 1px solid var(--line); }
+.metric-row > span:first-child { color: var(--ink-2); }
+.metric-row.best { background: var(--accent-soft); }
+.best-tag { color: var(--accent); font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; margin-left: 6px; }
+.sweep-table tr.best-row { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.exp-bar { display: inline-block; width: 90px; height: 6px; border-radius: 3px; background: var(--surface-2); margin-right: 10px; vertical-align: middle; position: relative; }
+.exp-bar > span { position: absolute; top: 0; height: 100%; border-radius: 3px; }
+.exp-bar > .pos { left: 50%; background: var(--profit); }
+.exp-bar > .neg { right: 50%; background: var(--loss); }
+@media (max-width: 900px) { .compare-cols { grid-template-columns: 1fr !important; } }

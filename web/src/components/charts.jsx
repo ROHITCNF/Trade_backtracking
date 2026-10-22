@@ -136,3 +136,33 @@ export function Sparkline({ values, width = 96, height = 24 }) {
     </svg>
   );
 }
+
+// Several runs' equity on one scale (compare, sweep). `lines` are
+// { name, curve, color, width?, z? }; colours come from the caller so the
+// compare screen can use categorical tokens and the sweep can grey the rest.
+export function EquityOverlay({ lines, height = 300 }) {
+  const c = useThemeColors();
+  const option = useMemo(() => {
+    const ax = axisStyle(c);
+    return {
+      ...baseOption(c),
+      grid: { left: 64, right: 16, top: 12, bottom: 28 },
+      xAxis: {
+        type: 'time', ...ax, splitLine: { show: false },
+        axisLabel: { ...ax.axisLabel, formatter: (v) => { const d = new Date(v); return d.getUTCMonth() === 0 ? `Jan '${String(d.getUTCFullYear()).slice(2)}` : MONTHS[d.getUTCMonth()]; } },
+      },
+      yAxis: { type: 'value', ...ax, axisLabel: { ...ax.axisLabel, formatter: compact } },
+      tooltip: {
+        ...baseOption(c).tooltip,
+        formatter: (ps) => `${dateShort(new Date(ps[0].value[0]).toISOString().slice(0, 10))}<br/>${ps.map((p) => `${p.marker}${p.seriesName} <b>${pnl(p.value[1])}</b>`).join('<br/>')}`,
+      },
+      series: lines.map((l, k) => ({
+        name: l.name, type: 'line', step: 'end', showSymbol: false, z: l.z ?? 2,
+        data: l.curve.map((p, i) => [ts(p.date) + (i % 300) * 1000, p.equity]),
+        lineStyle: { color: l.color, width: l.width ?? 1.6 }, itemStyle: { color: l.color },
+        ...(k === 0 ? { markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0 }], lineStyle: { color: c.muted, type: 'dashed', width: 1 }, label: { show: false } } } : {}),
+      })),
+    };
+  }, [lines, c]);
+  return <EChart option={option} height={height} />;
+}
