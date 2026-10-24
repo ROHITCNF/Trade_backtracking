@@ -8,7 +8,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { connectFyers, useMe } from '../lib/me.jsx';
 import { dateShort, qty, rupees } from '../lib/format.js';
-import { daysBetween, defaultTo, earliestFrom, rangeFor, istToday } from '../lib/dates.js';
+import { daysBetween, defaultTo, earliestFrom, lastTradingDay, rangeFor, istToday } from '../lib/dates.js';
 import Section from '../components/Section.jsx';
 import Segmented from '../components/Segmented.jsx';
 import Toggle from '../components/Toggle.jsx';
@@ -282,6 +282,8 @@ export default function NewBacktest() {
                   onChange={(e) => set({ toDate: e.target.value })} />
               </label>
               <div className="row">
+                <button type="button" className="chip-btn" onClick={() => set({ fromDate: today, toDate: today })}>Today</button>
+                <button type="button" className="chip-btn" onClick={() => { const d = lastTradingDay(today); set({ fromDate: d, toDate: d }); }}>Last trading day</button>
                 {[[12, '1Y'], [6, '6M'], [3, '3M'], [1, '1M']].map(([m, label]) => (
                   <button type="button" key={label} className="chip-btn" onClick={() => set(rangeFor(m, form.toDate, today))}>{label}</button>
                 ))}

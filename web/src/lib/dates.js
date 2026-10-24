@@ -41,6 +41,14 @@ export function defaultTo(now = Date.now()) {
   return trading ? addDays(today, -1) : today;
 }
 
+// The weekday before `today` (Monday gives Friday). Holidays are ignored for
+// now, so a holiday can come back and simply yield no trades.
+export function lastTradingDay(today = istToday()) {
+  let d = addDays(today, -1);
+  while ([0, 6].includes(toDate(d).getUTCDay())) d = addDays(d, -1);
+  return d;
+}
+
 // A 1Y/6M/3M/1M shortcut ending at `to`, never earlier than allowed.
 export function rangeFor(months, to, today = istToday()) {
   const from = addMonths(to, -months);
