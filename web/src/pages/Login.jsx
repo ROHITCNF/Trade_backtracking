@@ -60,7 +60,8 @@ export default function Login() {
         </div>
       </div>
       <div className="auth-art" aria-hidden="true">
-        <img src="/assets/login_banner.png" alt="" />
+        <img className="auth-art-fill" src="/assets/login_banner.png" alt="" />
+        <img className="auth-art-image" src="/assets/login_banner.png" alt="" />
       </div>
     </div>
   );
