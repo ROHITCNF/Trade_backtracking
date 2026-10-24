@@ -1,7 +1,8 @@
 // Ticker detail + trade panel (F6–F7; Ticker detail + trade panel.png). One
 // symbol of one run: its stat cards and equity, every trade, and — for the
-// selected trade (?trade=<id>) — a panel with the day's candles and the
-// trade's numbers. Candles cost one Fyers call, so they load only when a trade
+// selected trade (?trade=<id>) — the day's candles in place of the equity
+// curve (an Equity | Trade toggle flips back) and a panel with the trade's
+// numbers. On a phone the panel takes the screen and carries the chart itself. Candles cost one Fyers call, so they load only when a trade
 // is opened and are kept for the session; the numbers come from the saved run
 // and always render, whatever happens to the chart (States.png).
 
@@ -15,6 +16,7 @@ import { EquityChart } from '../components/charts.jsx';
 import MetricCards from '../components/MetricCards.jsx';
 import TradeChart from '../components/TradeChart.jsx';
 import Icon from '../components/Icon.jsx';
+import Segmented from '../components/Segmented.jsx';
 import { useNarrow } from '../lib/useMedia.js';
 
 const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
@@ -41,10 +43,11 @@ function useCandles(tradeId, attempt) {
   return state;
 }
 
-function ChartArea({ state, trade, orbEnd, onRetry }) {
+function ChartArea({ state, trade, orbEnd, height, onRetry }) {
+  const style = height ? { height } : undefined;
   if (state.loading) {
     return (
-      <div className="chart-state">
+      <div className="chart-state" style={style}>
         <div className="skel-bars">{Array.from({ length: 24 }, (_, i) => <span key={i} style={{ height: `${30 + ((i * 37) % 60)}%` }} />)}</div>
         <span className="caption">Loading 1-minute candles from Fyers…</span>
       </div>
@@ -53,7 +56,7 @@ function ChartArea({ state, trade, orbEnd, onRetry }) {
   const err = state.error;
   if (err?.status === 409) {
     return (
-      <div className="chart-state chart-state-box">
+      <div className="chart-state chart-state-box" style={style}>
         <Icon name="link" size={22} />
         <b>Connect Fyers to load the chart</b>
         <span className="caption">Candles are fetched from the broker on demand. The connection resets every morning — the trade’s numbers below don’t need it.</span>
@@ -63,7 +66,7 @@ function ChartArea({ state, trade, orbEnd, onRetry }) {
   }
   if (err?.status === 503) {
     return (
-      <div className="chart-state chart-state-box chart-state-warn">
+      <div className="chart-state chart-state-box chart-state-warn" style={style}>
         <Icon name="clock" size={22} />
         <b>Rate limit reached — try later</b>
         <span className="warn">{err.message} Backtest results aren’t affected.</span>
@@ -72,7 +75,7 @@ function ChartArea({ state, trade, orbEnd, onRetry }) {
   }
   if (err) {
     return (
-      <div className="chart-state chart-state-box">
+      <div className="chart-state chart-state-box" style={style}>
         <b>The chart didn’t load</b>
         <span className="caption">{err.message}</span>
         <button className="btn" onClick={onRetry}>Try again</button>
@@ -80,7 +83,32 @@ function ChartArea({ state, trade, orbEnd, onRetry }) {
     );
   }
   if (!state.data) return null;
-  return <TradeChart candles={state.data.candles} trade={trade} orbEnd={orbEnd} />;
+  return <TradeChart candles={state.data.candles} trade={trade} orbEnd={orbEnd} height={height} />;
+}
+
+// The selected trade's day: candles (or why they're missing) plus the legend.
+function TradeDayChart({ trade, orbEnd, height }) {
+  const [retry, setRetry] = useState(0);
+  const state = useCandles(trade.id, retry);
+  const reload = () => {
+    candleCache.delete(trade.id);
+    setRetry((n) => n + 1);
+  };
+  return (
+    <>
+      <div key={`${trade.id}-${retry}`}>
+        <ChartArea state={state} trade={trade} orbEnd={orbEnd} height={height} onRetry={reload} />
+      </div>
+      <div className="legend caption">
+        <span><i className="lg-band" />Opening range · {price(trade.orbLow)}–{price(trade.orbHigh)}</span>
+        <span><i className="lg-line lg-entry" />Entry</span>
+        <span><i className="lg-line lg-sl" />Stop</span>
+        <span><i className="lg-line lg-target" />Target</span>
+        <span><i className="lg-dot" />Entry {trade.entryTime}</span>
+        <span><i className="lg-sq" />Exit {trade.exitTime}</span>
+      </div>
+    </>
+  );
 }
 
 function Num({ label, value, className = '' }) {
@@ -93,13 +121,7 @@ function Num({ label, value, className = '' }) {
 }
 
 function TradePanel({ trade, index, total, onPrev, onNext, onClose, orbEnd, mobile = false }) {
-  const [retry, setRetry] = useState(0);
-  const state = useCandles(trade.id, retry);
   const risk = Math.abs(trade.entry - trade.sl) * trade.quantity;
-  const reload = () => {
-    candleCache.delete(trade.id);
-    setRetry((n) => n + 1);
-  };
   return (
     <aside className="card trade-panel">
       <div className="row page-head" style={{ alignItems: 'flex-start' }}>
@@ -121,17 +143,7 @@ function TradePanel({ trade, index, total, onPrev, onNext, onClose, orbEnd, mobi
           </>
         )}
       </div>
-      <div key={`${trade.id}-${retry}`}>
-        <ChartArea state={state} trade={trade} orbEnd={orbEnd} onRetry={reload} />
-      </div>
-      <div className="legend caption">
-        <span><i className="lg-band" />Opening range · {price(trade.orbLow)}–{price(trade.orbHigh)}</span>
-        <span><i className="lg-line lg-entry" />Entry</span>
-        <span><i className="lg-line lg-sl" />Stop</span>
-        <span><i className="lg-line lg-target" />Target</span>
-        <span><i className="lg-dot" />Entry {trade.entryTime}</span>
-        <span><i className="lg-sq" />Exit {trade.exitTime}</span>
-      </div>
+      {mobile && <TradeDayChart trade={trade} orbEnd={orbEnd} />}
       <div className="num-grid">
         <Num label="Entry time" value={`${trade.entryTime} IST`} />
         <Num label="Entry" value={`₹${price(trade.entry)}`} />
@@ -166,6 +178,7 @@ export default function TickerDetail() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const narrow = useNarrow();
+  const [view, setView] = useState('trade'); // left card while a trade is open: 'equity' | 'trade'
 
   useEffect(() => {
     const q = `symbols=${encodeURIComponent(symbol)}`;
@@ -178,6 +191,7 @@ export default function TickerDetail() {
   const selectedId = Number(params.get('trade')) || null;
   const index = useMemo(() => (data ? data.trades.findIndex((t) => t.id === selectedId) : -1), [data, selectedId]);
   const select = (tradeId) => {
+    if (tradeId) setView('trade');
     const next = new URLSearchParams(params);
     if (tradeId) next.set('trade', tradeId);
     else next.delete('trade');
@@ -189,6 +203,7 @@ export default function TickerDetail() {
   const { run, analysis, trades } = data;
   const name = analysis.symbols[0]?.name;
   const trade = index >= 0 ? trades[index] : null;
+  const showTrade = trade && view === 'trade';
 
   if (trade && narrow) {
     return (
@@ -226,9 +241,19 @@ export default function TickerDetail() {
           <div className={`ticker-layout${trade ? ' with-panel' : ''}`}>
             <div className="stack" style={{ minWidth: 0 }}>
               <section className="card chart-card">
-                <div className="row"><h2 className="section">{short(symbol)} equity</h2><span className="caption">cumulative ₹</span><span className="spacer" />
-                  <span className="caption">Net <b className={tone(analysis.metrics.totalPnl)}>{pnl(analysis.metrics.totalPnl)}</b></span></div>
-                <EquityChart curve={analysis.metrics.curve} height={trade ? 260 : 300} />
+                <div className="row">
+                  {showTrade ? (
+                    <><h2 className="section">{short(symbol)} · {dateShort(trade.date)}</h2><span className="caption">1-minute · 09:15–15:30 IST</span></>
+                  ) : (
+                    <><h2 className="section">{short(symbol)} equity</h2><span className="caption">cumulative ₹</span></>
+                  )}
+                  <span className="spacer" />
+                  {!showTrade && <span className="caption">Net <b className={tone(analysis.metrics.totalPnl)}>{pnl(analysis.metrics.totalPnl)}</b></span>}
+                  {trade && <Segmented label="Chart" value={view} onChange={setView} options={[['equity', 'Equity'], ['trade', 'Trade']]} />}
+                </div>
+                {showTrade
+                  ? <TradeDayChart key={trade.id} trade={trade} orbEnd={run.config.orbEnd} height={420} />
+                  : <EquityChart curve={analysis.metrics.curve} height={300} />}
               </section>
               <section className="card" style={{ padding: 0 }}>
                 <div className="row" style={{ padding: 'var(--s-3) var(--s-4)' }}>

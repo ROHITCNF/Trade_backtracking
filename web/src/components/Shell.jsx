@@ -53,8 +53,9 @@ export default function Shell() {
           </nav>
           <div className="spacer" />
           <HeaderStatus />
-          <button className="btn btn-ghost hide-sm" onClick={toggleTheme} aria-label="Toggle dark theme">
-            {theme === 'dark' ? 'Light' : 'Dark'}
+          <button className="btn btn-ghost icon-btn" onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'}>
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
           </button>
           <button className="btn" onClick={logout} aria-label="Log out">
             <span className="hide-xs">Log out</span>
