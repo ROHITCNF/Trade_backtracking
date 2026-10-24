@@ -333,7 +333,7 @@ export default function NewBacktest() {
             )}
           </Section>
 
-          <Section title="Entry, stop & target" summary={settingsLabel(c)}>
+          <Section title="Entry, stop & target" summary={settingsLabel(c)} defaultOpen={false}>
             <div className="fields">
               <label className="field"><span className="label">Direction</span>
                 <Segmented value={c.direction} options={[['long', 'Long'], ['short', 'Short'], ['both', 'Both']]} onChange={(direction) => setC({ direction })} label="Direction" />
@@ -374,7 +374,7 @@ export default function NewBacktest() {
             {form.sweep && <span className="caption">Sweep is on: the target here is replaced by each of the {SWEEP_VARIANTS} target rules.</span>}
           </Section>
 
-          <Section title="Sizing" summary={c.sizing === 'fixed' ? `Fixed · ${c.quantity} shares` : `Entry-price based · ${rupees(Number(c.capitalPerTrade))} × ${c.leverage}x`}>
+          <Section title="Sizing" summary={c.sizing === 'fixed' ? `Fixed · ${c.quantity} shares` : `Entry-price based · ${rupees(Number(c.capitalPerTrade))} × ${c.leverage}x`} defaultOpen={false}>
             <Segmented value={c.sizing} options={[['entryPrice', 'Entry-price based'], ['fixed', 'Fixed qty']]} onChange={(sizing) => setC({ sizing })} label="Sizing" />
             {c.sizing === 'entryPrice' ? (
               <div className="fields">
