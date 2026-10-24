@@ -35,27 +35,32 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <div className="auth-wrap">
-        <div className="auth-brand">
-          <BrandMark size={28} />
-          <span className="title">ORB Lab</span>
-        </div>
-        <form className="card auth-card" onSubmit={submit}>
-          <div>
-            <h1 className="title">Sign in</h1>
-            <p className="auth-sub">Opening Range Breakout backtests · NSE</p>
+      <div className="auth-main">
+        <div className="auth-wrap">
+          <div className="auth-brand">
+            <BrandMark size={28} />
+            <span className="title">ORB Lab</span>
           </div>
-          <label className="field">
-            <span className="label">Password</span>
-            <input className="input input-lg" type="password" autoFocus autoComplete="current-password"
-              value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={Boolean(error)} />
-          </label>
-          {error && <div className="field-error" role="alert">{error}</div>}
-          <button className="btn btn-primary btn-lg" disabled={busy || !password}>
-            {busy ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-        <p className="caption auth-foot">Single-user app · sessions last 7 days</p>
+          <form className="card auth-card" onSubmit={submit}>
+            <div>
+              <h1 className="title">Sign in</h1>
+              <p className="auth-sub">Opening Range Breakout backtests · NSE</p>
+            </div>
+            <label className="field">
+              <span className="label">Password</span>
+              <input className="input input-lg" type="password" autoFocus autoComplete="current-password"
+                value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={Boolean(error)} />
+            </label>
+            {error && <div className="field-error" role="alert">{error}</div>}
+            <button className="btn btn-primary btn-lg" disabled={busy || !password}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+          <p className="caption auth-foot">Single-user app · sessions last 7 days</p>
+        </div>
+      </div>
+      <div className="auth-art" aria-hidden="true">
+        <img src="/assets/login_banner.png" alt="" />
       </div>
     </div>
   );
