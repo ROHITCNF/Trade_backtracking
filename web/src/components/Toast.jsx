@@ -1,13 +1,13 @@
-// Brief confirmation after the Fyers OAuth round trip: the API redirects to
-// /?fyers=connected or ?fyers=error (F3). Reads the flag once, then drops it
-// from the URL so a reload doesn't repeat it.
+// After the Fyers OAuth round trip the API redirects to /?fyers=connected or
+// ?fyers=error (F3). Reads the flag once, refreshes the status pills, then drops
+// it from the URL so a reload doesn't repeat it. Only a failure gets a toast;
+// success shows in the header pill.
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '../lib/me.jsx';
 
 const MESSAGES = {
-  connected: ['ok', 'Fyers connected. Data calls are available until 06:30 IST tomorrow.'],
   error: ['error', 'Fyers connection didn’t complete. Try Connect Fyers again.'],
 };
 
@@ -19,11 +19,12 @@ export default function Toast() {
 
   useEffect(() => {
     const flag = params.get('fyers');
-    if (!flag || !MESSAGES[flag]) return;
-    setToast(MESSAGES[flag]);
+    if (!flag) return;
     refresh();
     params.delete('fyers');
     navigate({ search: params.toString() }, { replace: true });
+    if (!MESSAGES[flag]) return;
+    setToast(MESSAGES[flag]);
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
   }, [params, navigate, refresh]);
