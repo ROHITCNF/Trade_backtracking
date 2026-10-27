@@ -30,21 +30,20 @@
 
 .placeholder { color: var(--ink-3); }
 
-/* Form on the left, banner filling the right half; the banner drops on narrow screens. */
+/* Form on the left, illustration in an inset rounded panel on the right; the
+   panel drops on narrow screens. */
 .auth-page {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(400px, 1fr) 1.2fr;
+  grid-template-columns: minmax(400px, 1fr) 1fr;
+  gap: var(--s-4);
+  padding: var(--s-8);
 }
-.auth-main { display: grid; place-items: center; padding: var(--s-4); }
-.auth-art { position: relative; overflow: hidden; background: var(--surface-2); }
-/* The whole banner, never cropped, over a blurred copy of itself that fills the
-   panel's leftover space (the banner is 1.83:1; the panel is usually squarer). */
-.auth-art img { position: absolute; inset: 0; width: 100%; height: 100%; }
-.auth-art-fill { object-fit: cover; filter: blur(40px) brightness(0.85); transform: scale(1.15); }
-.auth-art-image { object-fit: contain; }
+.auth-main { position: relative; display: grid; place-items: center; padding: var(--s-12) var(--s-4); }
+.auth-art { position: relative; overflow: hidden; border-radius: 24px; background: var(--surface-2); }
+.auth-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 60%; }
 @media (max-width: 900px) {
-  .auth-page { grid-template-columns: 1fr; }
+  .auth-page { grid-template-columns: minmax(0, 1fr); padding: var(--s-4); }
   .auth-art { display: none; }
 }
 .auth-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-6); }
@@ -58,11 +57,16 @@
 }
 
 /* Login */
-.auth-wrap { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: var(--s-4); }
-.auth-brand { display: flex; align-items: center; gap: 10px; }
-.auth-card { max-width: none; gap: var(--s-4); padding: var(--s-6); }
-.auth-sub { margin: 2px 0 0; color: var(--ink-3); }
-.auth-foot { text-align: center; margin: 0; }
+.auth-wrap { width: 100%; max-width: 600px; display: flex; flex-direction: column; align-items: center; gap: var(--s-8); }
+.auth-brand { position: absolute; top: 0; left: 0; display: flex; align-items: center; gap: 10px; }
+.auth-hero { text-align: center; }
+.auth-headline {
+  margin: 0; font-family: var(--font-serif); font-weight: 500;
+  font-size: clamp(40px, 4.6vw, 60px); line-height: 1.05; letter-spacing: -0.02em; color: var(--ink);
+}
+.auth-sub { margin: var(--s-3) 0 0; font-family: var(--font-serif); font-size: 19px; line-height: 1.35; color: var(--ink-2); }
+.auth-card { max-width: 440px; gap: var(--s-4); padding: var(--s-6); border-radius: 14px; }
+.auth-foot { text-align: center; margin: 0; font-size: 12.5px; }
 
 /* Header pills */
 .pill-ok { background: var(--profit-soft); border-color: color-mix(in srgb, var(--profit) 25%, transparent); color: var(--ink); }

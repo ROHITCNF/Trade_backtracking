@@ -1,4 +1,4 @@
-// Password sign-in (F2, Login.png). One user; a wrong password says only that.
+// Password sign-in (F2, loginv2.png). One user; a wrong password says only that.
 
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -36,19 +36,20 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-main">
+        <div className="auth-brand">
+          <BrandMark size={28} />
+          <span className="title">ORB Lab</span>
+        </div>
         <div className="auth-wrap">
-          <div className="auth-brand">
-            <BrandMark size={28} />
-            <span className="title">ORB Lab</span>
+          <div className="auth-hero">
+            <h1 className="auth-headline">Fifteen minutes.<br />A year of proof.</h1>
+            <p className="auth-sub">Backtest the opening range breakout before you trade it.</p>
           </div>
           <form className="card auth-card" onSubmit={submit}>
-            <div>
-              <h1 className="title">Sign in</h1>
-              <p className="auth-sub">Opening Range Breakout backtests · NSE</p>
-            </div>
             <label className="field">
               <span className="label">Password</span>
               <input className="input input-lg" type="password" autoFocus autoComplete="current-password"
+                placeholder="Enter your password"
                 value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={Boolean(error)} />
             </label>
             {error && <div className="field-error" role="alert">{error}</div>}
@@ -56,12 +57,11 @@ export default function Login() {
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
-          <p className="caption auth-foot">Single-user app · sessions last 7 days</p>
+          <p className="caption auth-foot">Single-user app · NSE · data via Fyers</p>
         </div>
       </div>
       <div className="auth-art" aria-hidden="true">
-        <img className="auth-art-fill" src="/assets/login_banner.png" alt="" />
-        <img className="auth-art-image" src="/assets/login_banner.png" alt="" />
+        <img src="/assets/login_banner.jpg" alt="" />
       </div>
     </div>
   );

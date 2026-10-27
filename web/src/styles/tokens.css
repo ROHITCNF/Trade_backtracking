@@ -42,6 +42,7 @@
   --r-pill: 999px;
 
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Newsreader', Georgia, 'Times New Roman', serif;
   color-scheme: light;
 }
 
