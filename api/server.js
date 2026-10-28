@@ -33,7 +33,7 @@ function buildApp({ pool, config, worker = null, symbols = null, live = null, lo
   app.register(runRoutes, { symbols });
   app.register(analysisRoutes, { getCandles });
   app.register(watchlistRoutes);
-  app.register(liveRoutes, { tokenStatus });
+  app.register(liveRoutes, { tokenStatus, getCandles });
 
   // Liveness for Render: up, and the database answers.
   app.get('/api/health', async (request, reply) => {

@@ -19,6 +19,7 @@ const NAV = [
   ['/runs', 'Runs'],
   ['/compare', 'Compare'],
   ['/watchlists', 'Watchlists'],
+  ['/live', 'Live'],
 ];
 
 export default function Shell() {

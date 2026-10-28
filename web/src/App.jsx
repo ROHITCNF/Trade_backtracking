@@ -17,6 +17,7 @@ const Runs = lazy(() => import('./pages/Runs.jsx'));
 const TickerDetail = lazy(() => import('./pages/TickerDetail.jsx'));
 const Compare = lazy(() => import('./pages/Compare.jsx'));
 const Watchlists = lazy(() => import('./pages/Watchlists.jsx'));
+const Live = lazy(() => import('./pages/Live.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 function RequireSession({ children }) {
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="compare" element={<Compare />} />
         <Route path="watchlists" element={<Watchlists />} />
         <Route path="watchlists/:id" element={<Watchlists />} />
+        <Route path="live" element={<Live />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
