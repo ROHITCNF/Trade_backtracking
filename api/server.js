@@ -1,6 +1,7 @@
 // The web app's HTTP API (hld § API surface). One process runs the API and the
 // run worker: `npm run api`. Boot applies migrations, moves the Fyers token and
-// REST throttle onto Postgres, and resumes any unfinished run (FR-17).
+// REST throttle onto Postgres, resumes any unfinished run (FR-17) and starts the
+// live paper scheduler when LIVE_ENABLED=true (api/live.js).
 
 const Fastify = require('fastify');
 const cors = require('@fastify/cors');
@@ -14,11 +15,12 @@ const { analysisRoutes } = require('./routes/analysis');
 const { watchlistRoutes } = require('./routes/watchlists');
 
 // Builds the app without listening, so tests can drive it with app.inject().
-function buildApp({ pool, config, worker = null, symbols = null, logger = false, loginLimiter, newFyersClient, getCandles }) {
+function buildApp({ pool, config, worker = null, symbols = null, live = null, logger = false, loginLimiter, newFyersClient, getCandles }) {
   const app = Fastify({ logger, trustProxy: config.production });
   app.decorate('db', pool);
   app.decorate('worker', worker);
   app.decorate('symbols', symbols);
+  app.decorate('live', live);
   app.setErrorHandler(errorHandler);
   app.setNotFoundHandler(notFoundHandler);
 
@@ -55,6 +57,7 @@ async function start() {
   const { createWorker } = require('./worker');
   const { createSymbolMaster } = require('./symbols');
   const { seedWatchlists } = require('./db/watchlists');
+  const { createLiveScheduler } = require('./live');
 
   const pool = getPool();
   await migrate(pool);
@@ -65,9 +68,20 @@ async function start() {
   const worker = createWorker({ pool });
   const symbols = createSymbolMaster();
   symbols.start(); // not awaited: boot does not wait on Fyers' file server
-  const app = buildApp({ pool, config, worker, symbols, logger: true });
+  const live = createLiveScheduler({ pool, ...config.live });
+  const app = buildApp({ pool, config, worker, symbols, live, logger: true });
   await app.listen({ port: config.port, host: config.host });
   worker.wake();
+  live.start();
+
+  // Render sends SIGTERM before a deploy or restart: close the feed and flush
+  // pending live-state writes so the next instance resumes cleanly.
+  const shutdown = async () => {
+    await live.stop().catch((err) => console.error(`live stop failed: ${err.message}`));
+    process.exit(0);
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
   return app;
 }
 

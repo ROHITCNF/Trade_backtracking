@@ -170,11 +170,19 @@ function createLiveSession({
     await enqueue(() => store.save({ date, symbols: { ...saved.symbols } }));
   }
 
+  // Re-pulls today's candles over REST and re-evaluates every symbol. A host
+  // calls it just before stop() at the end of the day, so a held position gets
+  // its EOD exit even if no tick arrived after sessionEnd.
+  async function refresh() {
+    await backfill();
+    for (const symbol of symbols) evaluate(symbol);
+  }
+
   function getStatus() {
     return { date, running, symbols: symbols.length, connects, lastTickAt, ...counts() };
   }
 
-  return { start, stop, status: getStatus, onTick };
+  return { start, stop, refresh, status: getStatus, onTick };
 }
 
 module.exports = { createLiveSession, desiredState };

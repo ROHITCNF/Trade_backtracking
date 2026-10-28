@@ -154,3 +154,26 @@ test('start fails without a token and opens no feed', async () => {
   assert.equal(fed, false);
   assert.equal(session.status().running, false);
 });
+
+test('refresh books the EOD exit of a position held into sessionEnd', async () => {
+  let candles = [...openingRange(DATE), candle(DATE, '09:30', 100, 102, 100, 101.5)];
+  const store = memoryStore();
+  const session = createLiveSession({
+    symbols: [SYM],
+    config: config(),
+    store,
+    date: DATE,
+    log: () => {},
+    socketToken: async () => 'app:token',
+    warmStart: async (symbols, onSymbol) => onSymbol(SYM, candles),
+    startFeed: () => ({ close() {} }),
+  });
+  await session.start();
+  // No tick ever arrives after sessionEnd; the end-of-day REST pull carries it.
+  candles = [...candles, candle(DATE, '15:14', 101.6, 101.7, 101.5, 101.6)];
+  await session.refresh();
+  await session.stop();
+  assert.deepEqual(kinds(store), ['ENTRY', 'EXIT']);
+  assert.equal(store.decisions[1].reason, 'EOD');
+  assert.equal(store.state.symbols[SYM].position, 'CLOSED');
+});

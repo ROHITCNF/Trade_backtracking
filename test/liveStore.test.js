@@ -81,3 +81,12 @@ test('a session restarted on the Postgres store does not enter twice', { skip: n
     const decisions = await pool.query('select count(*)::int as n from live_decisions');
     assert.equal(decisions.rows[0].n, 1);
   }));
+
+test('loadWatchlist reads the named watchlist from Postgres', { skip: noDb }, () =>
+  withStore(async (store, pool) => {
+    const { loadWatchlist } = require('../api/live');
+    const { rows } = await pool.query(`insert into watchlists (name, source) values ('core', 'custom') returning id`);
+    await pool.query(`insert into watchlist_symbols (watchlist_id, symbol) values ($1, 'NSE:B-EQ'), ($1, 'NSE:A-EQ')`, [rows[0].id]);
+    assert.deepEqual(await loadWatchlist(pool, 'core'), ['NSE:A-EQ', 'NSE:B-EQ']);
+    assert.deepEqual(await loadWatchlist(pool, 'missing'), []);
+  }));
