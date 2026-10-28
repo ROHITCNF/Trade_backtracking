@@ -2,8 +2,11 @@
 // recorded. Read-only; the session itself is driven by api/live.js.
 
 const fyers = require('../../src/fyers');
-const { istToday, dateToEpoch, istParts } = require('../../src/time');
+const { getCandles: fetchCandles } = require('../../src/fetch');
+const { istToday, dateToEpoch, istParts, toMinutes } = require('../../src/time');
 const { round } = require('../../src/util');
+const { httpError } = require('../errors');
+const baseConfig = require('../../config');
 
 const DATE = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' };
 const DEFAULT_DAYS = 30;
@@ -40,7 +43,26 @@ function summarize(trades) {
 
 const daysBefore = (date, n) => istParts(dateToEpoch(date) - n * 86400).date;
 
-async function liveRoutes(app, { tokenStatus = fyers.tokenStatus } = {}) {
+// What the trade chart needs beyond the stored row: the opening range from the
+// day's candles, and epoch seconds for the entry and exit markers.
+function chartTrade(trade, candles, { orbStart, orbEnd }) {
+  const from = toMinutes(orbStart);
+  const to = toMinutes(orbEnd);
+  const range = candles.filter(([t]) => {
+    const m = istParts(t).minute;
+    return m >= from && m < to;
+  });
+  const at = (hhmm) => (hhmm ? dateToEpoch(trade.date) + toMinutes(hhmm) * 60 : null);
+  return {
+    ...trade,
+    orbHigh: range.length ? Math.max(...range.map((c) => c[2])) : null,
+    orbLow: range.length ? Math.min(...range.map((c) => c[3])) : null,
+    entryTs: at(trade.entryTime),
+    exitTs: at(trade.exitTime),
+  };
+}
+
+async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = fetchCandles, config = baseConfig } = {}) {
   const db = app.db;
 
   app.get('/api/live/status', async () => {
@@ -76,6 +98,31 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus } = {}) {
       return { date: request.params.date, decisions: rows.map((r) => ({ ...r, id: Number(r.id) })) };
     }
   );
+
+  // The paper trade's day on 1-minute candles: one Fyers call, never stored,
+  // like /api/trades/:id/candles for backtest trades.
+  app.get(
+    '/api/paper-trades/:date/:symbol/candles',
+    { schema: { params: { type: 'object', properties: { date: DATE, symbol: { type: 'string', maxLength: 64 } } } } },
+    async (request, reply) => {
+      const { date, symbol } = request.params;
+      const { rows } = await db.query(`select ${TRADE_COLUMNS} from paper_trades where date = $1 and symbol = $2`, [date, symbol]);
+      if (!rows.length) throw httpError(404, 'Paper trade not found');
+      let candles;
+      try {
+        candles = await getCandles({ symbol, resolution: '1', fromDate: date, toDate: date });
+      } catch (err) {
+        if (/No Fyers token/.test(err.message)) throw httpError(409, 'Connect Fyers to load the chart.');
+        if (/REST budget|429/.test(err.message)) throw httpError(503, err.message);
+        request.log.warn({ code: err.code, symbol, date }, 'paper candles: fetch failed');
+        throw httpError(502, 'Could not load candles from Fyers.');
+      }
+      candles = candles.map(([t, o, h, l, c]) => [t, o, h, l, c]);
+      // Today's candles keep changing; past days don't.
+      reply.header('cache-control', date === istToday() ? 'no-store' : 'private, max-age=3600');
+      return { trade: chartTrade(rowToTrade(rows[0]), candles, config), candles, orbEnd: config.orbEnd };
+    }
+  );
 }
 
-module.exports = { liveRoutes, summarize };
+module.exports = { liveRoutes, summarize, chartTrade };

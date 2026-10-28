@@ -8,14 +8,15 @@ const { signSession } = require('../api/auth/session');
 const { createLiveStore } = require('../api/db/liveStore');
 const { summarize } = require('../api/routes/live');
 const { createTestDb, noDb } = require('./db');
+const { candle, openingRange } = require('./helpers');
 
 const config = loadConfig({ DATABASE_URL: 'x', APP_PASSWORD_HASH: 'h', SESSION_SECRET: 'x'.repeat(32) });
 const headers = { authorization: `Bearer ${signSession(config.sessionSecret).token}` };
 const tokenStatus = async () => ({ connected: true, expiresAt: 1 });
 
-async function withApi(fn, { live = null } = {}) {
+async function withApi(fn, { live = null, getCandles } = {}) {
   const db = await createTestDb();
-  const app = buildApp({ pool: db.pool, config, live, tokenStatus });
+  const app = buildApp({ pool: db.pool, config, live, tokenStatus, getCandles });
   const call = (url, auth = headers) => app.inject({ method: 'GET', url, headers: auth });
   try {
     await fn({ call, pool: db.pool });
@@ -99,3 +100,30 @@ test('paper trades come back by date range with totals, and decisions by day', {
     assert.equal(dec.decisions[1].payload.reason, 'TARGET');
     assert.equal((await call('/api/paper-trades/2026-02-30x/decisions')).statusCode, 400);
   }));
+
+test('paper trade candles come with its opening range and marker times', { skip: noDb }, async () => {
+  const day = [...openingRange('2026-01-05'), candle('2026-01-05', '09:30', 100, 102, 100, 101.5)];
+  const getCandles = async ({ symbol }) => {
+    if (symbol === 'NSE:NOTOKEN-EQ') throw new Error('No Fyers token for today.');
+    return day;
+  };
+  await withApi(async ({ call, pool }) => {
+    const store = createLiveStore(pool);
+    await store.logDecision('2026-01-05', ev('ENTRY', 'NSE:A-EQ', { price: 101, sl: 100, target: 102, time: '09:30' }));
+    await store.logDecision('2026-01-05', ev('ENTRY', 'NSE:NOTOKEN-EQ', { price: 1, sl: 0.99 }));
+
+    const res = await call('/api/paper-trades/2026-01-05/NSE:A-EQ/candles');
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.candles.length, 16);
+    assert.equal(body.candles[0].length, 5, 'volume stripped');
+    assert.equal(body.orbEnd, '09:30');
+    assert.equal(body.trade.orbHigh, 101);
+    assert.equal(body.trade.orbLow, 99);
+    assert.equal(body.trade.entryTs, day[15][0]);
+    assert.equal(body.trade.exitTs, null, 'open trade has no exit marker');
+
+    assert.equal((await call('/api/paper-trades/2026-01-05/NSE:NONE-EQ/candles')).statusCode, 404);
+    assert.equal((await call('/api/paper-trades/2026-01-05/NSE:NOTOKEN-EQ/candles')).statusCode, 409);
+  }, { getCandles });
+});

@@ -88,12 +88,13 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360 }) {
       const dt = new Date(d.time * 1000);
       return dt.getUTCHours() * 60 + dt.getUTCMinutes() < orbEndMinute;
     });
-    if (inRange.length) series.attachPrimitive(new RangeBand(inRange[0].time, inRange.at(-1).time, trade.orbLow, trade.orbHigh, `${c.accent}1F`));
+    if (inRange.length && trade.orbHigh != null) series.attachPrimitive(new RangeBand(inRange[0].time, inRange.at(-1).time, trade.orbLow, trade.orbHigh, `${c.accent}1F`));
 
+    // A live paper trade still open has no exit yet.
     createSeriesMarkers(series, [
       { time: trade.entryTs + IST, position: 'atPriceMiddle', shape: 'circle', color: c.accent, price: trade.entry, text: '' },
-      { time: trade.exitTs + IST, position: 'atPriceMiddle', shape: 'square', color: c.ink, price: trade.exit, text: '' },
-    ]);
+      trade.exitTs != null && { time: trade.exitTs + IST, position: 'atPriceMiddle', shape: 'square', color: c.ink, price: trade.exit, text: '' },
+    ].filter(Boolean));
     chart.timeScale().fitContent();
     return () => chart.remove();
   }, [candles, trade, orbEnd, height, c]);

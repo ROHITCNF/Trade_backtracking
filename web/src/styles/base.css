@@ -183,6 +183,7 @@ table.data tr.muted td { color: var(--muted); }
 .filters select.input { height: 30px; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
 .stat-grid .stat-card { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; }
+.stat-grid-fit { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .stat-card { display: flex; flex-direction: column; gap: 2px; padding: var(--s-3) var(--s-4); background: var(--surface); min-width: 0; }
 .stat-card .caption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .portfolio-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-2); }
