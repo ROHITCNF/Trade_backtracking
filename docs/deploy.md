@@ -7,7 +7,7 @@ steps below are the owner's, because they need accounts and secrets.
 
 | piece | where | from |
 |---|---|---|
-| API + run worker | Render web service `orb-lab-api` (Starter, Singapore, always on) | `node api/server.js`; migrates and seeds on boot |
+| API + run worker + live paper | Render web service `orb-lab-api` (Free, Singapore; kept awake in market hours by a pinger) | `node api/server.js`; migrates and seeds on boot |
 | Frontend | Render static site `orb-lab-web` | `web/` built to `web/dist`, every path rewritten to `index.html` |
 | Database | Neon Postgres | pooled connection string |
 | Fyers | a **second** Fyers API app, used only by the web callback | myapi.fyers.in |
@@ -55,6 +55,61 @@ in at build time, so redeploy the static site after changing it.
 - `https://<api host>/api/health` → `{"ok":true}`.
 - Open the static site → sign in → Connect Fyers → header shows your name.
 - Then the production smoke test (#40).
+
+## 6. Live paper trading
+
+The API records ORB paper trades from live ticks into Neon (`paper_trades`).
+No orders are placed. The live session is hosted by the API itself
+(`api/live.js`); see `server/architecture.md` § Hosting inside the API.
+
+### Settings
+
+| variable | value | effect |
+|---|---|---|
+| `LIVE_ENABLED` | `true` | turns the scheduler on; anything else leaves it off |
+| `LIVE_WATCHLIST` | `core` | name of the watchlist (in the app's Watchlists screen) it trades |
+
+### Keep the free instance awake
+
+Render's free instance sleeps after 15 minutes without an **incoming** request.
+The live session's Fyers websocket is outgoing, so it doesn't count: without
+help the instance sleeps mid-session and the feed dies. Render's free plan has
+no background workers or cron, so an outside service does the waking:
+
+1. Create a free job on [cron-job.org](https://cron-job.org).
+2. URL: `https://<api host>/api/health`.
+3. Schedule → **Custom**, crontab `*/10 9-15 * * 1-5` (every 10 minutes,
+   09:00–15:50, Monday–Friday).
+4. **ADVANCED** tab → timezone **Asia/Kolkata**. It defaults to UTC, which
+   would ping at 14:30–21:20 IST instead.
+5. Check "Next executions" shows weekday times from 9:00 AM, then save.
+
+### The day, as the API runs it
+
+| IST | what happens |
+|---|---|
+| 09:00 | first ping wakes the instance |
+| before 09:15 | **you** sign in and click Connect Fyers; the token dies at 06:30 every morning |
+| 09:10 → | with a token, the session starts: warm start pulls today's candles (~39 calls), then the websocket |
+| 09:15–15:14 | breakouts, stops and targets are written to `paper_trades` as the engine decides them |
+| 15:19 | end-of-day REST pull books EOD exits, the session stops |
+| 15:19–15:50 | once per day: reconcile against a backtest (~39 calls); a day with no session is backfilled |
+
+Connecting Fyers late is fine: the session starts within 30 s of the token
+arriving, and warm start recovers the candles it missed. A Render restart or
+deploy mid-session is also fine: positions come back from `live_state`, so
+nothing is entered twice.
+
+### Rules
+
+- **Never run `npm run live` locally while the server session runs.** Both use
+  the same Fyers account, socket and REST budget.
+- Avoid big backtests around 09:10: they share the REST throttle with warm
+  start and slow it down.
+- Watch the Live page's "Checked against backtest" table. A mismatch means the
+  live plumbing is wrong, never the strategy (`server/architecture.md`).
+- NSE holidays aren't known yet (#69): on a weekday holiday the session starts,
+  sees no ticks and records nothing.
 
 ## Local production check
 
