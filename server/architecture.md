@@ -110,6 +110,26 @@ the end of each trading day, so `npm run login` is a morning ritual. A refresh-t
 exists but the vendor documents it as possibly being withdrawn, so daily login is treated
 as the reliable path.
 
+## Hosting inside the API
+
+`npm run live` is one host for `session.js`; the web API is the other. The deployed
+API runs on Render's free tier, which has no background workers or cron and wipes its
+disk on restart, so:
+
+| piece | file | job |
+|---|---|---|
+| scheduler | `api/live.js` | every 30 s: on a weekday from 09:10 IST to `sessionEnd` + 5 min, with a Fyers token and a non-empty watchlist, start a session; afterwards `refresh()` (EOD exits) and `stop()` |
+| state store | `api/db/liveStore.js` | `live_state`, `live_decisions`, `paper_trades` in Postgres, same `{ load, save, logDecision }` shape as `state.js` |
+| reconcile | `api/reconcile.js` | once per day after the close: backtest the day on REST candles and diff it against `paper_trades`; on a day with no session, backfill it |
+| routes | `api/routes/live.js` | status, paper trades, decisions, per-trade candles, manual reconcile |
+
+An external pinger on `/api/health` keeps the instance awake through market hours
+(docs/deploy.md § Live paper trading). The scheduler is off unless `LIVE_ENABLED=true`.
+
+Reconciliation is "the one rule" made into a test that runs every day: paper fills come
+from the engine, so live and backtest must agree to the paisa. A mismatch is a plumbing
+bug here, never a second opinion about the strategy.
+
 ## What is deliberately not here
 
 - **Order placement.** Phase 3, after paper output matches the backtest for a few weeks.

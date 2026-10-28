@@ -5,13 +5,16 @@
 # created; see docs/deploy.md for where each one comes from.
 
 services:
-  # API and run worker in one always-on process. A free instance sleeps when
-  # idle and would stall a running backtest (resume recovers it, but slowly).
+  # API, run worker and live paper scheduler in one process. On the free plan
+  # the instance sleeps after 15 minutes without inbound HTTP (the Fyers
+  # websocket doesn't count), so an external pinger hits /api/health during
+  # market hours; see docs/deploy.md § Live paper trading. A running backtest
+  # outside those hours can still stall on sleep; resume recovers it.
   - type: web
     name: orb-lab-api
     runtime: node
     region: singapore
-    plan: starter
+    plan: free
     buildCommand: npm ci --omit=dev
     startCommand: node api/server.js
     healthCheckPath: /api/health
@@ -47,6 +50,10 @@ services:
         sync: false
       - key: REST_DAILY_CAP # leaves 1,000 of the account's 5,000 for the CLI
         value: "3800"
+      - key: LIVE_ENABLED # paper trading on market days (api/live.js); no orders
+        value: "true"
+      - key: LIVE_WATCHLIST # watchlist name the live session trades
+        value: core
 
   # The React app, built to static files. Every path falls back to index.html
   # so client-side routes survive a reload.

@@ -114,6 +114,11 @@ version in sync with the `addCandlestickSeries` / `addAreaSeries` calls in the t
 `data/live/`. It places no orders. `src/engine.js` stays the only place strategy logic lives; see
 `server/architecture.md` before touching it.
 
+The deployed API hosts the same session (`server/session.js` via `api/live.js`, on when
+`LIVE_ENABLED=true`) with state in Postgres (`paper_trades`, `live_state`, `live_decisions`), and
+reconciles each day against a backtest after the close (`api/reconcile.js`). Setup, and the
+cron-job.org pinger that keeps the free Render instance awake: `docs/deploy.md` § Live paper trading.
+
 ## Credentials
 
 `FYERS_APP_ID`, `FYERS_SECRET_ID` and `FYERS_REDIRECT_URI` live in `.env` (gitignored, loaded by
