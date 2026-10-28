@@ -54,3 +54,12 @@ export function dailyRows(trades) {
     .sort((a, b) => a.key.localeCompare(b.key))
     .map(({ wins, ...d }) => ({ ...d, pnl: Math.round(d.pnl * 100) / 100, winRate: Math.round((wins / d.trades) * 100) }));
 }
+
+// One reconciliation (live vs backtest, after the close) as a short verdict.
+export function reconLabel(r) {
+  const parts = [];
+  if (r.mismatches.length) parts.push(`${r.mismatches.length} mismatch${r.mismatches.length === 1 ? '' : 'es'}`);
+  else if (r.backfilled === 0 || r.matched > 0) parts.push(`${r.matched}/${r.checked} matched`);
+  if (r.backfilled) parts.push(`${r.backfilled} backfilled`);
+  return { text: parts.join(' · '), tone: r.mismatches.length ? 'loss' : 'profit' };
+}

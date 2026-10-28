@@ -8,7 +8,7 @@ import { api } from '../lib/api.js';
 import { connectFyers } from '../lib/me.jsx';
 import { addDays, istToday } from '../lib/dates.js';
 import { dateLong, dateShort, pnl, price, qty, rate, tone } from '../lib/format.js';
-import { dailyRows, inLiveWindow, liveNotice, sessionLabel } from '../lib/live.js';
+import { dailyRows, inLiveWindow, liveNotice, reconLabel, sessionLabel } from '../lib/live.js';
 import { PnlBars } from '../components/charts.jsx';
 import { Stat } from '../components/MetricCards.jsx';
 import TradeChart from '../components/TradeChart.jsx';
@@ -117,12 +117,48 @@ function TradesTable({ trades, selected, onSelect, showDate }) {
   );
 }
 
+// After each close the API re-runs the day as a backtest; live and backtest
+// must agree exactly. A mismatch is a plumbing bug worth opening.
+function Reconciliations({ items, onRecheck, busy }) {
+  if (!items.length) return null;
+  return (
+    <section className="stack">
+      <h2 className="title">Checked against backtest</h2>
+      <div className="card table-wrap" style={{ padding: 0 }}>
+        <table className="data">
+          <thead>
+            <tr><th>Date</th><th>Result</th><th>Details</th><th /></tr>
+          </thead>
+          <tbody>
+            {items.map((r) => {
+              const v = reconLabel(r);
+              return (
+                <tr key={r.date}>
+                  <td className="nowrap">{dateShort(r.date)}</td>
+                  <td className={`nowrap ${v.tone}`}><b>{v.text}</b></td>
+                  <td>
+                    {r.mismatches.length === 0
+                      ? <span className="caption">{r.backfilled ? 'Live didn’t run; trades filled in from the backtest.' : 'Every symbol agrees.'}</span>
+                      : r.mismatches.map((m) => <div key={m.symbol} className="caption"><b>{short(m.symbol)}</b> · {m.problem}</div>)}
+                  </td>
+                  <td className="num"><button className="btn" disabled={busy === r.date} onClick={() => onRecheck(r.date)}>{busy === r.date ? 'Checking…' : 'Re-check'}</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export default function Live() {
   const [status, setStatus] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [days, setDays] = useState('30');
   const [selected, setSelected] = useState(null);
+  const [rechecking, setRechecking] = useState(null);
   const today = istToday();
 
   const load = useCallback(async () => {
@@ -150,6 +186,17 @@ export default function Live() {
     const t = setInterval(load, POLL_MS);
     return () => clearInterval(t);
   }, [live, load]);
+
+  async function recheck(date) {
+    setRechecking(date);
+    try {
+      await api(`/api/paper-trades/${date}/reconcile`, { method: 'POST' });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+    setRechecking(null);
+  }
 
   if (error && !data) return <div className="banner banner-error">{error}</div>;
   if (!data || !status) return <p className="placeholder">Loading live paper trading…</p>;
@@ -209,6 +256,8 @@ export default function Live() {
           <p className="caption">No paper trades in the last {days} days.</p>
         )}
       </section>
+
+      <Reconciliations items={data.reconciliations} onRecheck={recheck} busy={rechecking} />
     </div>
   );
 }

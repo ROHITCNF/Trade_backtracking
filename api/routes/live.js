@@ -6,6 +6,8 @@ const { getCandles: fetchCandles } = require('../../src/fetch');
 const { istToday, dateToEpoch, istParts, toMinutes } = require('../../src/time');
 const { round } = require('../../src/util');
 const { httpError } = require('../errors');
+const { reconcileDay } = require('../reconcile');
+const { loadWatchlist } = require('../live');
 const baseConfig = require('../../config');
 
 const DATE = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' };
@@ -40,6 +42,12 @@ function summarize(trades) {
     days: [...byDate].sort(([a], [b]) => a.localeCompare(b)).map(([date, pnl]) => ({ date, pnl: round(pnl) })),
   };
 }
+
+// True once today's session is over (sessionEnd has passed in IST).
+const afterClose = (date, now = Date.now()) => {
+  const { date: today, minute } = istParts(Math.floor(now / 1000));
+  return date < today || (date === today && minute > toMinutes(baseConfig.sessionEnd));
+};
 
 const daysBefore = (date, n) => istParts(dateToEpoch(date) - n * 86400).date;
 
@@ -83,7 +91,12 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
         [from, to]
       );
       const trades = rows.map(rowToTrade);
-      return { from, to, trades, ...summarize(trades) };
+      const rec = await db.query(
+        `select date::text as date, reconciled_at as "reconciledAt", checked, matched, backfilled, mismatches
+         from paper_reconciliations where date between $1 and $2 order by date desc`,
+        [from, to]
+      );
+      return { from, to, trades, ...summarize(trades), reconciliations: rec.rows };
     }
   );
 
@@ -96,6 +109,25 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
         [request.params.date]
       );
       return { date: request.params.date, decisions: rows.map((r) => ({ ...r, id: Number(r.id) })) };
+    }
+  );
+
+  // Re-checks a day against the backtest by hand: for a day the scheduler
+  // missed, or after fixing a mismatch. One Fyers call per symbol.
+  app.post(
+    '/api/paper-trades/:date/reconcile',
+    { schema: { params: { type: 'object', properties: { date: DATE } } } },
+    async (request) => {
+      const { date } = request.params;
+      if (!afterClose(date)) throw httpError(409, 'The day isn’t over yet.');
+      const symbols = await loadWatchlist(db, app.live?.status().watchlist || 'core');
+      try {
+        return await reconcileDay({ pool: db, date, symbols, config, getCandles });
+      } catch (err) {
+        if (/No Fyers token/.test(err.message)) throw httpError(409, 'Connect Fyers to reconcile.');
+        if (/REST budget|429/.test(err.message)) throw httpError(503, err.message);
+        throw err;
+      }
     }
   );
 

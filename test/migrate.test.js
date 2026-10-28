@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { migrate } = require('../api/db/migrate');
 const { createTestDb, noDb } = require('./db');
 
-const TABLES = ['fyers_token', 'live_decisions', 'live_state', 'oauth_state', 'paper_trades', 'rest_usage', 'run_symbols', 'runs', 'schema_migrations', 'trades', 'watchlist_symbols', 'watchlists'];
+const TABLES = ['fyers_token', 'live_decisions', 'live_state', 'oauth_state', 'paper_reconciliations', 'paper_trades', 'rest_usage', 'run_symbols', 'runs', 'schema_migrations', 'trades', 'watchlist_symbols', 'watchlists'];
 
 test('a fresh database migrates cleanly and a rerun is a no-op', { skip: noDb }, async () => {
   const { pool, drop } = await createTestDb({ migrated: false });

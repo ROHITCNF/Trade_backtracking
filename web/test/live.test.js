@@ -56,3 +56,10 @@ test('daily rows sum closed trades per date, oldest first', () => {
   ]);
   assert.deepEqual(dailyRows([]), []);
 });
+
+test('reconciliation verdicts', async () => {
+  const { reconLabel } = await import('../src/lib/live.js');
+  assert.deepEqual(reconLabel({ checked: 39, matched: 39, backfilled: 0, mismatches: [] }), { text: '39/39 matched', tone: 'profit' });
+  assert.deepEqual(reconLabel({ checked: 39, matched: 37, backfilled: 0, mismatches: [{}, {}] }), { text: '2 mismatches', tone: 'loss' });
+  assert.deepEqual(reconLabel({ checked: 39, matched: 0, backfilled: 4, mismatches: [] }), { text: '4 backfilled', tone: 'profit' });
+});
