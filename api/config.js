@@ -21,6 +21,11 @@ function loadConfig(env = process.env) {
     frontendUrl: (env.FRONTEND_URL || DEV_FRONTEND).replace(/\/$/, ''),
     passwordHash: env.APP_PASSWORD_HASH,
     sessionSecret: env.SESSION_SECRET,
+    // Live paper trading (api/live.js). Off unless explicitly enabled.
+    live: {
+      enabled: env.LIVE_ENABLED === 'true',
+      watchlist: env.LIVE_WATCHLIST || 'core',
+    },
   };
 }
 
