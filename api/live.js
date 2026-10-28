@@ -5,10 +5,13 @@
 //
 // Every check is idempotent: a restart mid-session simply starts a new session,
 // which restores its positions from Postgres and backfills today's candles.
+// After the session ends, the day is reconciled once against a backtest
+// (api/reconcile.js).
 
 const baseConfig = require('../config');
 const { createLiveSession } = require('../server/session');
 const { createLiveStore } = require('./db/liveStore');
+const { reconcileDay } = require('./reconcile');
 const { readToken } = require('../src/fyers');
 const { istParts, toMinutes, IST_OFFSET_SECONDS } = require('../src/time');
 
@@ -38,6 +41,8 @@ function createLiveScheduler({
   hasToken = async () => Boolean(await readToken()),
   symbolsFor = (name) => loadWatchlist(pool, name),
   createSession = createLiveSession,
+  reconcile = (args) => reconcileDay({ pool, ...args }),
+  isReconciled = async (date) => (await pool.query('select 1 from paper_reconciliations where date = $1', [date])).rows.length > 0,
   now = () => Date.now(),
   intervalMs = 30000,
   log = (msg) => console.log(`live: ${msg}`),
@@ -48,6 +53,7 @@ function createLiveScheduler({
   let busy = false;
   let waiting = null; // the date we last logged "waiting for a token", so it logs once a day
   let lastError = null;
+  let reconciledFor = null; // the date already reconciled, so the check runs once a day
 
   async function endSession() {
     const ending = session;
@@ -67,7 +73,11 @@ function createLiveScheduler({
     const inWindow = isWeekday(nowSec) && minute >= START_AT && minute < stopAt;
 
     if (session && (session.status().date !== date || !inWindow)) await endSession();
-    if (session || !inWindow) return;
+    if (session) return;
+    if (!inWindow) {
+      if (isWeekday(nowSec) && minute >= stopAt) await reconcileOnce(date);
+      return;
+    }
 
     if (!(await hasToken())) {
       if (waiting !== date) log('market day, but no Fyers token yet; connect Fyers to start');
@@ -94,6 +104,23 @@ function createLiveScheduler({
       await next.stop().catch(() => {});
       lastError = err.message;
       log(`session start failed: ${err.message}`);
+    }
+  }
+
+  // Costs one REST call per symbol, so it waits for a token and runs once.
+  async function reconcileOnce(date) {
+    if (reconciledFor === date || !(await hasToken())) return;
+    if (await isReconciled(date)) {
+      reconciledFor = date;
+      return;
+    }
+    try {
+      await reconcile({ date, symbols: await symbolsFor(watchlist), config, log });
+      reconciledFor = date;
+    } catch (err) {
+      lastError = `reconcile failed: ${err.message}`;
+      log(lastError);
+      reconciledFor = date; // a spent budget or dead token won't heal today; reconcile by hand later
     }
   }
 
