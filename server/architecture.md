@@ -60,8 +60,9 @@ That table is the whole translation layer. No engine changes were needed for it.
 | `candles.js` | ticks → IST-aligned 1-minute candles |
 | `warmstart.js` | REST backfill of today's candles, on launch and after a reconnect |
 | `feed.js` | `fyersDataSocket` wrapper, auto-reconnect |
-| `state.js` | writes decisions and positions to `data/live/`, survives a restart |
-| `live.js` | the loop that ties the above together |
+| `state.js` | file state store: decisions and positions in `data/live/`, survives a restart |
+| `session.js` | one day's loop that ties the above together, as `start()` / `stop()`; state goes through an injected store |
+| `live.js` | terminal host for `session.js` with the file store (`npm run live`) |
 | `broker/paper.js` | records simulated fills |
 
 ## Why each awkward bit exists
@@ -79,9 +80,11 @@ forming.
 ticks change neither. This is a large saving over 39 symbols and it is deterministic —
 a tick that cannot change the outcome cannot trigger a decision.
 
-**State is on disk.** A dropped socket or a laptop sleeping must not produce a second
-entry on a symbol already held. `live.js` restores from `data/live/state-<date>.json` first and
-only then starts the feed.
+**State is persisted.** A dropped socket or a laptop sleeping must not produce a second
+entry on a symbol already held. `session.js` restores from its store first and only then
+starts the feed. `npm run live` uses the file store (`data/live/state-<date>.json`); a web
+host, whose disk does not survive a restart, passes a Postgres store of the same shape
+(`{ load, save, logDecision }`).
 
 ## Rate limits — the one that ends the day
 

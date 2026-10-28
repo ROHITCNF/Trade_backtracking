@@ -1,6 +1,11 @@
 // Everything the runner must remember across a restart. A laptop that sleeps
 // mid-session must not come back and take a second position in a symbol it
 // already holds.
+//
+// The file implementation of the live session's state store ({ load, save,
+// logDecision }, see server/session.js), used by `npm run live`. The API uses a
+// Postgres store of the same shape, since a web host's disk does not survive a
+// restart.
 
 const fs = require('fs');
 const path = require('path');
