@@ -10,7 +10,7 @@ import { addDays, istToday } from '../lib/dates.js';
 import { dateLong, dateShort, pnl, price, qty, rate, tone } from '../lib/format.js';
 import { dailyRows, inLiveWindow, liveNotice, reconLabel, sessionLabel } from '../lib/live.js';
 import { PnlBars } from '../components/charts.jsx';
-import { Stat } from '../components/MetricCards.jsx';
+import { Stat } from '../components/Stat.jsx';
 import TradeChart from '../components/TradeChart.jsx';
 import Segmented from '../components/Segmented.jsx';
 import Icon from '../components/Icon.jsx';

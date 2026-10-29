@@ -47,7 +47,7 @@ export default function Banners() {
           <span className="warn">New runs and trade charts are paused until the budget resets at midnight IST. Saved results, filters and exports still work.</span>
         </div>
         <span className="spacer" />
-        <Link className="btn" to="/runs">View saved runs</Link>
+        <Link className="btn" to="/research">Saved research</Link>
       </div>
     );
   }

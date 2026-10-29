@@ -1,7 +1,8 @@
 # backtestV2
 
 Opening Range Breakout (ORB) backtester for NSE stocks on 1-minute Fyers data, with a paper
-live runner. A deployed web dashboard is being added — see [docs/](docs/).
+live runner, and a private web app (Journal · Research · Live) that wraps the same engine —
+see [docs/](docs/).
 
 ## Status
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bestIndex, ruleLabel, settingRows, tickerRows } from '../src/lib/compare.js';
+import { bestIndex, settingRows, tickerRows } from '../src/lib/compare.js';
 
 const run = (config, extra = {}) => ({
   fromDate: '2025-10-23', toDate: '2026-10-21', total: 39, watchlistName: 'core',
@@ -28,9 +28,6 @@ test('BEST needs a single winner', () => {
 });
 
 test('rule labels and per-ticker spread', () => {
-  assert.equal(ruleLabel({ targetMode: 'none' }), 'None');
-  assert.equal(ruleLabel({ targetMode: 'R', targetR: 0.5 }), '0.5R');
-  assert.equal(ruleLabel({ targetMode: 'pct', targetPct: 2.5 }), '2.5%');
   const rows = tickerRows([
     { bySymbol: { A: { pnl: 100, trades: 2 }, B: { pnl: 50, trades: 1 } } },
     { bySymbol: { A: { pnl: -20, trades: 2 }, C: { pnl: 5, trades: 1 } } },

@@ -1,8 +1,10 @@
-// Routes for every screen in docs/design/reference/. Everything but /login sits
-// behind a session; an expired one (any 401) lands back on /login.
+// Routes for the v2 screens (docs/design/reference/v2/): Journal, Research,
+// Live, and the ticker page. Everything but /login sits behind a session; an
+// expired one (any 401) lands back on /login. The v1 addresses redirect to
+// where their content now lives (decisions D14).
 
 import { lazy, useEffect } from 'react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { setUnauthorizedHandler } from './lib/api.js';
 import { readSession } from './lib/session.js';
 import Shell from './components/Shell.jsx';
@@ -10,15 +12,9 @@ import Login from './pages/Login.jsx';
 
 // Screens load on demand: charts (ECharts, Lightweight Charts) stay out of the
 // first download, so login and the shell appear fast.
-const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
-const NewBacktest = lazy(() => import('./pages/NewBacktest.jsx'));
-const RunProgress = lazy(() => import('./pages/RunProgress.jsx'));
-const Runs = lazy(() => import('./pages/Runs.jsx'));
-const Research = lazy(() => import('./pages/Research.jsx'));
 const Journal = lazy(() => import('./pages/Journal.jsx'));
+const Research = lazy(() => import('./pages/Research.jsx'));
 const TickerDetail = lazy(() => import('./pages/TickerDetail.jsx'));
-const Compare = lazy(() => import('./pages/Compare.jsx'));
-const Watchlists = lazy(() => import('./pages/Watchlists.jsx'));
 const Live = lazy(() => import('./pages/Live.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
@@ -26,6 +22,25 @@ function RequireSession({ children }) {
   const location = useLocation();
   if (!readSession()) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   return children;
+}
+
+// /runs/:id and /runs/:id/progress → that run in Research.
+function RunRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/research?run=${id}`} replace />;
+}
+
+// /compare?ids=1,2 → ticked in Research; a sweep has no v2 screen (D19).
+function CompareRedirect() {
+  const [params] = useSearchParams();
+  const ids = params.get('ids');
+  return <Navigate to={ids ? `/research?compare=${ids}` : '/research'} replace />;
+}
+
+// /watchlists/:id → that list's sheet on the Journal.
+function WatchlistRedirect() {
+  const { id } = useParams();
+  return <Navigate to={id ? `/?edit=${id}` : '/'} replace />;
 }
 
 export default function App() {
@@ -44,15 +59,16 @@ export default function App() {
       >
         <Route index element={<Journal />} />
         <Route path="research" element={<Research />} />
-        <Route path="runs" element={<Runs />} />
-        <Route path="runs/:id" element={<Dashboard />} />
-        <Route path="runs/:id/progress" element={<RunProgress />} />
         <Route path="runs/:id/symbols/:symbol" element={<TickerDetail />} />
-        <Route path="new" element={<NewBacktest />} />
-        <Route path="compare" element={<Compare />} />
-        <Route path="watchlists" element={<Watchlists />} />
-        <Route path="watchlists/:id" element={<Watchlists />} />
         <Route path="live" element={<Live />} />
+
+        <Route path="runs" element={<Navigate to="/research" replace />} />
+        <Route path="runs/:id" element={<RunRedirect />} />
+        <Route path="runs/:id/progress" element={<RunRedirect />} />
+        <Route path="new" element={<Navigate to="/research" replace />} />
+        <Route path="compare" element={<CompareRedirect />} />
+        <Route path="watchlists" element={<WatchlistRedirect />} />
+        <Route path="watchlists/:id" element={<WatchlistRedirect />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
