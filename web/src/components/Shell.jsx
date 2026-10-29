@@ -1,25 +1,22 @@
-// App frame: the header (nav, status pills, logout) and any blocking-condition
-// banners over the current screen.
+// App frame (v2): brand, Journal · Research · Live, and the status chip; any
+// blocking-condition banners sit over the current screen.
 
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Suspense, useState } from 'react';
 import { clearSession } from '../lib/session.js';
 import { applyTheme, readTheme } from '../lib/theme.js';
 import { MeProvider } from '../lib/me.jsx';
 import BrandMark from './BrandMark.jsx';
-import HeaderStatus from './HeaderStatus.jsx';
+import StatusChip from './StatusChip.jsx';
 import Banners from './Banners.jsx';
 import Toast from './Toast.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
-import Icon from './Icon.jsx';
 
+// Each tab also owns the screens reached from it, so it stays lit there.
 const NAV = [
-  ['/', 'Dashboard', true],
-  ['/new', 'New backtest'],
-  ['/runs', 'Runs'],
-  ['/compare', 'Compare'],
-  ['/watchlists', 'Watchlists'],
-  ['/live', 'Live'],
+  ['/', 'Journal', (p) => p === '/' || p.startsWith('/watchlists')],
+  ['/research', 'Research', (p) => /^\/(research|runs|new|compare)(\/|$)/.test(p)],
+  ['/live', 'Live', (p) => p.startsWith('/live')],
 ];
 
 export default function Shell() {
@@ -41,27 +38,20 @@ export default function Shell() {
     <MeProvider>
       <header className="header">
         <div className="header-inner">
-          <NavLink to="/" className="brand">
-            <BrandMark />
+          <Link to="/" className="brand">
+            <BrandMark size={24} />
             ORB Lab
-          </NavLink>
+          </Link>
           <nav className="nav">
-            {NAV.map(([to, label, end]) => (
-              <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            {NAV.map(([to, label, isOn]) => (
+              <Link key={to} to={to} className={`nav-link${isOn(location.pathname) ? ' active' : ''}`}
+                aria-current={isOn(location.pathname) ? 'page' : undefined}>
                 {label}
-              </NavLink>
+              </Link>
             ))}
           </nav>
           <div className="spacer" />
-          <HeaderStatus />
-          <button className="btn btn-ghost icon-btn" onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} title={theme === 'dark' ? 'Light theme' : 'Dark theme'}>
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
-          </button>
-          <button className="btn" onClick={logout} aria-label="Log out">
-            <span className="hide-xs">Log out</span>
-            <span className="show-xs"><Icon name="logout" /></span>
-          </button>
+          <StatusChip theme={theme} onTheme={toggleTheme} onLogout={logout} />
         </div>
       </header>
       <main className="page">

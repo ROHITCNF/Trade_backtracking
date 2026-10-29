@@ -41,6 +41,8 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+        {/* Research is the Runs list until its own screen lands (#88). */}
+        <Route path="research" element={<Runs />} />
         <Route path="runs" element={<Runs />} />
         <Route path="runs/:id" element={<Dashboard />} />
         <Route path="runs/:id/progress" element={<RunProgress />} />
