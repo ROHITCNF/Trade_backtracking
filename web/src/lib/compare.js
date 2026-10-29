@@ -1,4 +1,4 @@
-// Comparison logic for the Compare and Sweep screens, kept pure for tests.
+// Comparison logic for comparing ticked Research runs, kept pure for tests.
 
 import { dateShort, pnl, profitFactor, qty, rate, rMultiple, rupees } from './format.js';
 import { stopLabel, targetLabel } from './runs.js';
@@ -48,12 +48,6 @@ export function bestIndex(values, better) {
   const target = better === 'max' ? Math.max(...values) : Math.min(...values);
   const hits = values.filter((v) => v === target).length;
   return hits === 1 ? values.indexOf(target) : -1;
-}
-
-// A sweep variant's rule: "1.5R", "2%", "None".
-export function ruleLabel(config) {
-  if (config.targetMode === 'none') return 'None';
-  return config.targetMode === 'R' ? `${config.targetR}R` : `${config.targetPct}%`;
 }
 
 // Per-ticker rows across runs: { symbol, cells: [{pnl, trades} | null], spread },

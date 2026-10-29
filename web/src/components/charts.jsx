@@ -1,4 +1,4 @@
-// The dashboard's charts (Run dashboard.png, design system § Chart styles).
+// The Research, Journal and Live charts (design system § Chart styles).
 // Every number shown comes from the API; these only draw it.
 
 import { useMemo } from 'react';
@@ -106,27 +106,6 @@ export function PnlBars({ rows, label = (r) => r.key, height = 200 }) {
       series: [{ type: 'bar', barMaxWidth: 36, data: rows.map((r) => ({ value: r.pnl, itemStyle: { color: signColor(c, r.pnl), borderRadius: 2 } })) }],
     };
   }, [rows, c, label]);
-  return <EChart option={option} height={height} />;
-}
-
-// Count of trades per 0.2% P&L bucket; losing buckets red, winning green.
-export function Histogram({ bins, height = 200 }) {
-  const c = useThemeColors();
-  const option = useMemo(() => {
-    const ax = axisStyle(c);
-    return {
-      ...baseOption(c),
-      grid: { left: 8, right: 8, top: 12, bottom: 28 },
-      xAxis: { type: 'category', data: bins.map((b) => `${b.from}%`), ...ax, splitLine: { show: false }, axisLabel: { ...ax.axisLabel, hideOverlap: true } },
-      yAxis: { type: 'value', show: false },
-      tooltip: {
-        ...baseOption(c).tooltip,
-        axisPointer: { type: 'shadow', shadowStyle: { color: c.surface2, opacity: 0.6 } },
-        formatter: ([p]) => { const b = bins[p.dataIndex]; return `${b.from}% to ${b.to}%<br/><b>${qty(b.count)}</b> trades`; },
-      },
-      series: [{ type: 'bar', barCategoryGap: '12%', data: bins.map((b) => ({ value: b.count, itemStyle: { color: signColor(c, b.from + 0.1), borderRadius: 1 } })) }],
-    };
-  }, [bins, c]);
   return <EChart option={option} height={height} />;
 }
 

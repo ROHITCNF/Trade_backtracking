@@ -14,8 +14,8 @@ import ErrorBoundary from './ErrorBoundary.jsx';
 
 // Each tab also owns the screens reached from it, so it stays lit there.
 const NAV = [
-  ['/', 'Journal', (p) => p === '/' || p.startsWith('/watchlists')],
-  ['/research', 'Research', (p) => /^\/(research|runs|new|compare)(\/|$)/.test(p)],
+  ['/', 'Journal', (p) => p === '/'],
+  ['/research', 'Research', (p) => /^\/(research|runs)(\/|$)/.test(p)],
   ['/live', 'Live', (p) => p.startsWith('/live')],
 ];
 

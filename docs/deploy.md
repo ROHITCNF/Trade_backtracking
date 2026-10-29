@@ -67,7 +67,7 @@ No orders are placed. The live session is hosted by the API itself
 | variable | value | effect |
 |---|---|---|
 | `LIVE_ENABLED` | `true` | turns the scheduler on; anything else leaves it off |
-| `LIVE_WATCHLIST` | `core` | name of the watchlist (in the app's Watchlists screen) it trades |
+| `LIVE_WATCHLIST` | `core` | name of the list (edited from the app's Journal) it trades |
 
 ### Keep the free instance awake
 

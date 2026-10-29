@@ -27,14 +27,6 @@ export function runTitle(run) {
   return `${what} · ${durationLabel(run.fromDate, run.toDate)} · ${targetLabel(run.config)}`;
 }
 
-// A sweep's name: what the owner called it (its runs are named "<name> · <rule>";
-// an unnamed sweep's runs are just "<rule>"), else what it ran.
-export function sweepTitle(run) {
-  if (run.name?.includes(' · ')) return run.name.split(' · ').slice(0, -1).join(' · ');
-  const what = run.watchlistName ? `${run.watchlistName} ${run.total}` : `${run.total} symbols`;
-  return `${what} · ${durationLabel(run.fromDate, run.toDate)} · sweep`;
-}
-
 // Planned Fyers calls for a run: one per symbol per 60-day chunk (api/runSpec.js).
 export const plannedCalls = (run) => run.total * Math.max(1, Math.ceil(daysBetween(run.fromDate, run.toDate) / 60));
 

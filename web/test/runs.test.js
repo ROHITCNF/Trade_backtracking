@@ -16,10 +16,3 @@ test('run titles and labels', () => {
   assert.equal(plannedCalls(run), 39 * 7);
 });
 
-import { sweepTitle } from '../src/lib/runs.js';
-
-test('sweep titles', () => {
-  const run = { name: 'Core sweep · 1.5R', watchlistName: 'core', total: 39, fromDate: '2025-10-23', toDate: '2026-10-21' };
-  assert.equal(sweepTitle(run), 'Core sweep');
-  assert.equal(sweepTitle({ ...run, name: '1.5R' }), 'core 39 · 1 year · sweep');
-});

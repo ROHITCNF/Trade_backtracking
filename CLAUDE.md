@@ -20,6 +20,10 @@ npm run migrate              # apply api/db/migrations to DATABASE_URL
 npm run web                  # React frontend (web/, Vite) on :5173; `npm --prefix web test` for its tests
 ```
 
+The web app's screens are Journal (`/`), Research (`/research`), Live (`/live`) and the ticker
+page (`/runs/:id/symbols/:symbol`), from `docs/design/reference/v2/`; `docs/decisions.md` D14–D21
+says how they map onto the unchanged API (Journal runs are ordinary runs named `Journal · <id>`).
+
 `runAll.js` and `summary.js` demand an explicit count (`5`, `all`) and take an optional list name
 from `lists/`. There is no bare invocation, because `fno.txt` is 207 symbols — about 1,400 API
 calls (~30 minutes at 50/min) for a year of 1-minute data.
