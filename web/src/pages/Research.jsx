@@ -1,9 +1,10 @@
 // Research (v2/Research — desktop.png, mobile.png): the launcher bar, one card
-// per research run with its progress inline (decisions D20), and the selected
-// run's results below (?run=<id>). Journal runs and sweeps are not shown here.
+// per research run with its progress inline (decisions D20), and below them the
+// selected run's results (?run=<id>) or, with two to four cards ticked
+// (?compare=1,2), the comparison. Journal runs and sweeps are not shown here.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { connectFyers, useMe } from '../lib/me.jsx';
 import { dateShort, duration, pnl, profitFactor, qty, tone } from '../lib/format.js';
@@ -19,9 +20,12 @@ import SymbolSubset from '../components/SymbolSubset.jsx';
 import StrategyFields from '../components/StrategyFields.jsx';
 import StatusPill from '../components/StatusPill.jsx';
 import Icon from '../components/Icon.jsx';
+import RunResults from '../components/RunResults.jsx';
+import RunsCompare from '../components/RunsCompare.jsx';
 
 const POLL_MS = 3000;
 const CARDS_SHOWN = 8;
+const MAX_COMPARE = 4;
 const RANGES = [['1', '1M'], ['3', '3M'], ['6', '6M'], ['12', '1Y'], ['custom', 'Custom']];
 
 // Watchlists, runs and the default strategy, reloaded on demand and every few
@@ -212,7 +216,7 @@ function CardMenu({ run, onUse, onRename, onDelete }) {
   );
 }
 
-function ResultCard({ run, selected, onSelect, onAction, onUse }) {
+function ResultCard({ run, selected, ticked, canTick, onTick, onSelect, onAction, onUse }) {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(run.name || '');
   const current = useCurrentSymbol(run);
@@ -229,6 +233,10 @@ function ResultCard({ run, selected, onSelect, onAction, onUse }) {
     <article className={`result-card${selected ? ' on' : ''}`} onClick={() => !renaming && onSelect(run.id)} tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onSelect(run.id)} aria-current={selected || undefined}>
       <div className="result-card-top">
+        {run.status === 'done' && (
+          <input type="checkbox" className="result-tick" checked={ticked} disabled={!ticked && !canTick} aria-label={`Compare ${cardTitle(run)}`}
+            onClick={(e) => e.stopPropagation()} onChange={() => onTick(run.id)} />
+        )}
         {renaming ? (
           <input className="input" autoFocus value={name} maxLength={120} onClick={(e) => e.stopPropagation()} onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setRenaming(false); }} onBlur={saveName} />
@@ -260,7 +268,7 @@ function ResultCard({ run, selected, onSelect, onAction, onUse }) {
   );
 }
 
-function ResultCards({ runs, selectedId, onSelect, onAction, onUse }) {
+function ResultCards({ runs, selectedId, ticked, onTick, onSelect, onAction, onUse }) {
   const [all, setAll] = useState(false);
   if (!runs.length) {
     return <p className="caption">No research yet. Pick a list or a ticker and a range above, then Run research.</p>;
@@ -269,8 +277,12 @@ function ResultCards({ runs, selectedId, onSelect, onAction, onUse }) {
   return (
     <div className="stack" style={{ gap: 'var(--s-2)' }}>
       <div className="result-cards">
-        {shown.map((r) => <ResultCard key={r.id} run={r} selected={r.id === selectedId} onSelect={onSelect} onAction={onAction} onUse={onUse} />)}
+        {shown.map((r) => (
+          <ResultCard key={r.id} run={r} selected={ticked.length < 2 && r.id === selectedId} ticked={ticked.includes(r.id)} canTick={ticked.length < MAX_COMPARE}
+            onTick={onTick} onSelect={onSelect} onAction={onAction} onUse={onUse} />
+        ))}
       </div>
+      <span className="caption">{ticked.length ? `${ticked.length} ticked · ${ticked.length < 2 ? 'tick one more to compare' : 'comparing below'}` : 'Tick two to four to compare.'}</span>
       {runs.length > CARDS_SHOWN && (
         <button className="link-btn accent" style={{ alignSelf: 'flex-start' }} onClick={() => setAll(!all)}>
           {all ? 'Show fewer' : `Show all ${runs.length} runs`}
@@ -293,7 +305,15 @@ export default function Research() {
 
   const runs = useMemo(() => (data ? researchRuns(data.items) : []), [data]);
   const selectedId = Number(params.get('run')) || runs.find((r) => r.status === 'done')?.id || null;
+  const ticked = (params.get('compare') || '').split(',').map(Number).filter((id) => runs.some((r) => r.id === id));
   const select = (id) => setParams({ run: String(id) }, { replace: true });
+  const setTicked = (ids) => {
+    const next = new URLSearchParams(params);
+    if (ids.length) next.set('compare', ids.join(','));
+    else next.delete('compare');
+    setParams(next, { replace: true });
+  };
+  const tick = (id) => setTicked(ticked.includes(id) ? ticked.filter((x) => x !== id) : [...ticked, id]);
 
   // Rename / cancel / resume with a patch body; delete with null.
   async function act(id, body) {
@@ -345,13 +365,12 @@ export default function Research() {
       <Launcher form={form} setForm={setForm} lists={data.lists} strategy={data.strategy}
         onStarted={async (id) => { await reload(); select(id); }} />
       {actionError && <div className="banner banner-error">{actionError}</div>}
-      <ResultCards runs={runs} selectedId={selectedId} onSelect={select} onAction={act} onUse={use} />
-      {selected?.status === 'done' && (
-        <section className="card row" style={{ padding: 'var(--s-3) var(--s-4)' }}>
-          <span className="spacer"><b>{cardTitle(selected)}</b> <span className="caption">· {settingsLabel(selected.config)}</span></span>
-          <Link className="btn" to={`/runs/${selected.id}`}>Open results</Link>
-        </section>
-      )}
+      <ResultCards runs={runs} selectedId={selectedId} ticked={ticked} onTick={tick} onSelect={select} onAction={act} onUse={use} />
+      {ticked.length >= 2 ? (
+        <RunsCompare ids={ticked} onClear={() => setTicked([])} />
+      ) : selected && ['done', 'failed', 'cancelled'].includes(selected.status) && selected.done > 0 ? (
+        <RunResults key={selected.id} run={selected} strategy={data.strategy} />
+      ) : null}
     </div>
   );
 }
