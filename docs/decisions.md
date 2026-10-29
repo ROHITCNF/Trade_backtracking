@@ -24,3 +24,20 @@ the decision below says which one wins.
 | D11 | **The sweep screen's "% targets equal R targets" note appears only when the stop mode is `pct`.** | Only then is 1R exactly 1%. With `tighter`, the stop can sit closer than 1%, so 1R < 1%. |
 | D12 | **Profit factor with zero gross loss is shown as ∞.** | `computeMetrics` returns `null` in that case; the design's `4406.94` for a symbol with no losing trades is a sample-data error. |
 | D13 | **Light theme is the default, dark is supported** with the same token names. | The design system defines light first and pairs every token with a dark value. |
+
+## 2026-10-29 — v2: Journal and Research
+
+Source: the screens in [design/reference/v2/](design/reference/v2/) (`Journal` and
+`Research`, desktop and mobile). They replace the v1 screens as the UI source of truth.
+v1's decisions above still hold unless one below overrides them.
+
+| # | decision | why |
+|---|---|---|
+| D14 | **Navigation is Journal · Research · Live.** Journal is the home screen. Dashboard, New backtest, Runs, Run progress, Compare and Watchlists are removed; their URLs redirect. | The v2 design folds launch, results and comparison into Research, and lists into Journal. Fewer places to look. |
+| D15 | **v2 is frontend only. The API, worker, schema and engine do not change.** A backend change needs its own decision here, made only if the frontend cannot do the job. | The API already serves everything the screens need (runs, filtered analysis, trades, compare, watchlists, estimate). Keeping the backend fixed keeps the parity guarantee (NFR-1) untouched. |
+| D16 | **Journal runs are ordinary runs named `Journal · <watchlist id>`**, one per list, covering the last 40 calendar days up to the last finished session. Opening Journal queues any that are missing or stale; once a newer one is done, older ones for that list are deleted. | 40 days is under one 60-day history chunk, so a refresh costs 1 call per symbol (264 for core + final + F&O, ~7% of the 3,800 cap) and holds the 20 trading days the heatmap shows. Recomputing the whole window means every day uses the current strategy. |
+| D17 | **"Runs automatically at 15:45 IST" means: the first time Journal is opened after 15:45 on a weekday** (Fyers connected, budget allowing). There is no server cron. | A server job needs a backend change (D15), and it would need the day's Fyers token anyway, which only exists after the morning connect. The data is history, so running later gives the same trades. |
+| D18 | **The default strategy is the newest Journal run's settings** (`/api/defaults` until one exists). Changing it re-runs every list. Research starts from it and may override it per run. | No settings table exists (D15), and `/api/defaults` follows whatever ran last, Research included. |
+| D19 | **Sweeps are dropped from the UI.** The API keeps supporting them. | Not in the v2 design; comparing ticked Research runs covers the need. |
+| D20 | **The ticker page stays** (`/runs/:id/symbols/:symbol`), restyled to v2. **Run progress is shown inline** on the Research card. | No v2 mockup replaces either; "click a symbol to see its trades" needs the ticker page. |
+| D21 | **Day P&L for the heatmap comes from the run's equity curve**, differenced per trade and grouped by date. | `/api/runs/:id/analysis` already returns it in entry order; no per-day endpoint is needed (D15). |

@@ -4,6 +4,11 @@
 > Revision v1.1 (2026-10-22): watchlists, charts and the design review — see
 > [decisions.md](decisions.md).
 
+> Revision v2 (2026-10-29): the UI follows [design/reference/v2/](design/reference/v2/) —
+> Journal · Research · Live, frontend only. See [decisions.md](decisions.md) D14–D21; the
+> screens and flows below that v2 removes (Dashboard, launcher, Runs, Compare, sweep,
+> Watchlists) are superseded, the functional rules behind them still apply.
+
 What v1 is. Why: [intent.md](intent.md). How: [hld.md](hld.md).
 
 ## Scope

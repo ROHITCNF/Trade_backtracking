@@ -86,6 +86,22 @@ Render + Neon. **The owner is needed here**: Neon project, second Fyers app, Ren
 | [#39](https://github.com/ROHITCNF/Trade_backtracking/issues/39) | Create Neon project, second Fyers app, Render services (owner) |
 | [#40](https://github.com/ROHITCNF/Trade_backtracking/issues/40) | Production smoke test and token-conflict check |
 
+## M7 · v2 Journal & Research
+
+The v2 design in `docs/design/reference/v2/`, frontend only ([decisions.md](decisions.md) D14–D21).
+
+| issue | task |
+|---|---|
+| [#86](https://github.com/ROHITCNF/Trade_backtracking/issues/86) | Record the v2 design decisions and the M7 plan |
+| [#87](https://github.com/ROHITCNF/Trade_backtracking/issues/87) | v2 shell: Journal · Research · Live nav and the status chip |
+| [#88](https://github.com/ROHITCNF/Trade_backtracking/issues/88) | Research: launcher bar, estimate and result cards with inline progress |
+| [#89](https://github.com/ROHITCNF/Trade_backtracking/issues/89) | Research: results view and compare |
+| [#90](https://github.com/ROHITCNF/Trade_backtracking/issues/90) | Journal: daily auto-run per list and the 20-day heatmap |
+| [#91](https://github.com/ROHITCNF/Trade_backtracking/issues/91) | Journal: day view — list cards, day summary, top movers |
+| [#92](https://github.com/ROHITCNF/Trade_backtracking/issues/92) | Journal: add and edit lists (search symbols or import .txt) |
+| [#93](https://github.com/ROHITCNF/Trade_backtracking/issues/93) | Restyle the ticker page and Live for v2, mobile pass |
+| [#94](https://github.com/ROHITCNF/Trade_backtracking/issues/94) | Remove the v1 screens and the sweep UI |
+
 ## Owner involvement
 
 Only M5 needs the owner:
