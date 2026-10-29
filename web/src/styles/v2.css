@@ -114,3 +114,42 @@ table.by-symbol td { padding-top: 7px; padding-bottom: 7px; }
   .by-symbol-head .input { width: 100%; }
   .results-head { align-items: center; }
 }
+
+/* Journal heatmap */
+.heat-card { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); }
+.heat-scroll { overflow-x: auto; }
+table.heat { border-collapse: separate; border-spacing: 4px; width: 100%; margin: -4px; }
+table.heat thead th { font-weight: 500; font-size: 11.5px; line-height: 14px; color: var(--ink-3); text-align: center; white-space: nowrap; padding-bottom: 2px; }
+table.heat thead th span { display: block; }
+table.heat thead th.on { color: var(--ink); font-weight: 700; }
+.heat-list { text-align: left !important; min-width: 104px; position: sticky; left: 0; background: var(--surface); z-index: 1; padding-right: var(--s-2); }
+th.heat-list { font-weight: 500; }
+.heat-name { display: block; color: var(--ink); font-weight: 600; font-size: 14px; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.heat-name:hover { text-decoration-color: var(--ink); }
+.heat-list .caption { display: block; font-weight: 400; }
+table.heat td { padding: 0; }
+.heat-cell {
+  font: inherit; font-size: 12px; font-weight: 500; width: 100%; min-width: 50px; height: 40px; padding: 0 2px; border-radius: var(--r-control);
+  border: 1px solid transparent; color: var(--ink); cursor: pointer; white-space: nowrap;
+}
+.heat-cell:hover { border-color: var(--line-strong); }
+.heat-cell.on { border: 2px solid var(--ink); }
+.heat-empty { background: var(--surface-2); color: var(--muted); }
+.heat-profit.heat-1 { background: color-mix(in srgb, var(--profit) 10%, var(--surface)); }
+.heat-profit.heat-2 { background: color-mix(in srgb, var(--profit) 22%, var(--surface)); }
+.heat-profit.heat-3 { background: color-mix(in srgb, var(--profit) 36%, var(--surface)); }
+.heat-profit.heat-4 { background: color-mix(in srgb, var(--profit) 52%, var(--surface)); }
+.heat-loss.heat-1 { background: color-mix(in srgb, var(--loss) 10%, var(--surface)); }
+.heat-loss.heat-2 { background: color-mix(in srgb, var(--loss) 22%, var(--surface)); }
+.heat-loss.heat-3 { background: color-mix(in srgb, var(--loss) 34%, var(--surface)); }
+.heat-loss.heat-4 { background: color-mix(in srgb, var(--loss) 48%, var(--surface)); }
+.heat-total { text-align: right !important; white-space: nowrap; padding-left: var(--s-3) !important; font-size: 14px; }
+.heat-key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+.heat-add { display: block; text-align: center; padding: var(--s-3); border: 1px dashed var(--line-strong); border-radius: var(--r-input); font-weight: 500; }
+.heat-add:hover { background: var(--accent-soft); text-decoration: none; }
+@media (max-width: 720px) {
+  .heat-card { padding: var(--s-3); }
+  .heat-list { min-width: 92px; }
+  .heat-cell { min-width: 52px; height: 38px; font-size: 12px; }
+  .journal .page-head .btn-lg { height: 36px; }
+}

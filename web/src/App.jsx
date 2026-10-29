@@ -15,6 +15,7 @@ const NewBacktest = lazy(() => import('./pages/NewBacktest.jsx'));
 const RunProgress = lazy(() => import('./pages/RunProgress.jsx'));
 const Runs = lazy(() => import('./pages/Runs.jsx'));
 const Research = lazy(() => import('./pages/Research.jsx'));
+const Journal = lazy(() => import('./pages/Journal.jsx'));
 const TickerDetail = lazy(() => import('./pages/TickerDetail.jsx'));
 const Compare = lazy(() => import('./pages/Compare.jsx'));
 const Watchlists = lazy(() => import('./pages/Watchlists.jsx'));
@@ -41,7 +42,7 @@ export default function App() {
           </RequireSession>
         }
       >
-        <Route index element={<Dashboard />} />
+        <Route index element={<Journal />} />
         <Route path="research" element={<Research />} />
         <Route path="runs" element={<Runs />} />
         <Route path="runs/:id" element={<Dashboard />} />
