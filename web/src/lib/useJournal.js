@@ -116,5 +116,33 @@ export function useJournal() {
     await load();
   }, [load, refresh]);
 
-  return { data, error, queueError, canQueue, reload: load, applyStrategy, retry };
+  // After a list's symbols change: queue it again now (a swap that keeps the
+  // count would otherwise look current), or just reload when it can't run yet.
+  const redo = useCallback(async (listId) => {
+    const { watchlists } = await api('/api/watchlists');
+    const list = watchlists.find((w) => w.id === listId);
+    if (list?.count && canQueue) {
+      const to = journalTo();
+      requested.add(`${list.id}|${to}|${JSON.stringify(data.strategy)}|${list.count}`);
+      try {
+        await queueRun(list, to, data.strategy);
+      } catch (err) {
+        setQueueError(`Couldn’t update ${list.name}: ${err.message}`);
+      }
+      refresh();
+    }
+    await load();
+  }, [canQueue, data, load, refresh]);
+
+  // A deleted list's Journal runs go with it (active ones are cancelled first).
+  const forget = useCallback(async (listId) => {
+    const s = data?.state.find((x) => x.list.id === listId);
+    for (const r of s?.runs || []) {
+      if (r.status === 'queued' || r.status === 'running') await api(`/api/runs/${r.id}`, { method: 'PATCH', body: { cancel: true } }).catch(() => {});
+      else await api(`/api/runs/${r.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+    await load();
+  }, [data, load]);
+
+  return { data, error, queueError, canQueue, reload: load, applyStrategy, retry, redo, forget };
 }

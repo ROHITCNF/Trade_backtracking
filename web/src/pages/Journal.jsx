@@ -4,7 +4,7 @@
 // opened up.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { connectFyers, useMe } from '../lib/me.jsx';
 import { dateLong, dateShort, pnl, qty, tone } from '../lib/format.js';
 import { settingsLabel } from '../lib/runs.js';
@@ -14,6 +14,7 @@ import { useJournal } from '../lib/useJournal.js';
 import StrategyFields from '../components/StrategyFields.jsx';
 import Icon from '../components/Icon.jsx';
 import JournalDay from '../components/JournalDay.jsx';
+import ListSheet from '../components/ListSheet.jsx';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -98,7 +99,7 @@ function StrategyPanel({ strategy, onApply, onClose, calls }) {
   );
 }
 
-function Heatmap({ data, day, onDay }) {
+function Heatmap({ data, day, onDay, onEdit }) {
   const scroller = useRef(null);
   const map = useMemo(() => heatmap(data.rows), [data.rows]);
   // Phones scroll the grid sideways; start at the latest day.
@@ -134,7 +135,7 @@ function Heatmap({ data, day, onDay }) {
                 return (
                   <tr key={list.id}>
                     <th className="heat-list" scope="row">
-                      <Link to={`/watchlists/${list.id}`} className="heat-name">{list.name}</Link>
+                      <button type="button" className="link-btn heat-name" onClick={() => onEdit(list.id)}>{list.name}</button>
                       <span className="caption">{list.count} symbols</span>
                     </th>
                     {cells.map((c) => (
@@ -155,7 +156,7 @@ function Heatmap({ data, day, onDay }) {
           </table>
         </div>
       )}
-      <Link to="/watchlists" className="heat-add">+ Add list — search symbols or import a .txt</Link>
+      <button type="button" className="heat-add" onClick={() => onEdit('new')}>+ Add list — search symbols or import a .txt</button>
       <div className="legend caption">
         <span><i className="heat-key heat-profit heat-2" />profitable day</span>
         <span><i className="heat-key heat-loss heat-2" />losing day</span>
@@ -166,9 +167,9 @@ function Heatmap({ data, day, onDay }) {
 }
 
 export default function Journal() {
-  const { data, error, queueError, canQueue, applyStrategy, retry } = useJournal();
+  const { data, error, queueError, canQueue, applyStrategy, retry, redo, forget } = useJournal();
   const [params, setParams] = useSearchParams();
-  const [editing, setEditing] = useState(false);
+  const [strategyOpen, setStrategyOpen] = useState(false);
 
   if (error) return <div className="banner banner-error">{error}</div>;
   if (!data) return <p className="placeholder">Loading…</p>;
@@ -177,9 +178,11 @@ export default function Journal() {
   const calls = data.lists.reduce((a, w) => a + w.count, 0);
   const setParam = (key, value) => {
     const next = new URLSearchParams(params);
-    next.set(key, String(value));
+    if (value === null) next.delete(key);
+    else next.set(key, String(value));
     setParams(next, { replace: true });
   };
+  const editing = params.get('edit');
 
   return (
     <div className="stack journal">
@@ -188,16 +191,21 @@ export default function Journal() {
           <h1 className="display">Journal</h1>
           <p className="page-sub">
             ORB runs on each list automatically at 15:45 IST · Default strategy ({settingsLabel(data.strategy)}){' '}
-            <button className="link-btn accent" onClick={() => setEditing(!editing)}>change</button>
+            <button className="link-btn accent" onClick={() => setStrategyOpen(!strategyOpen)}>change</button>
           </p>
         </div>
-        <Link className="btn btn-lg" to="/watchlists">+ Add list</Link>
+        <button className="btn btn-lg" onClick={() => setParam('edit', 'new')}>+ Add list</button>
       </div>
-      {editing && <StrategyPanel strategy={data.strategy} calls={calls} onApply={applyStrategy} onClose={() => setEditing(false)} />}
+      {strategyOpen && <StrategyPanel strategy={data.strategy} calls={calls} onApply={applyStrategy} onClose={() => setStrategyOpen(false)} />}
       <UpdateNote data={data} queueError={queueError} canQueue={canQueue} onRetry={retry} />
-      <Heatmap data={data} day={day} onDay={(d) => setParam('day', d)} />
+      <Heatmap data={data} day={day} onDay={(d) => setParam('day', d)} onEdit={(id) => setParam('edit', id)} />
       <JournalDay state={data.state} dates={dates} day={day} onDay={(d) => setParam('day', d)}
         listId={Number(params.get('list')) || null} onList={(id) => setParam('list', id)} />
+      {editing && (
+        <ListSheet key={editing} listId={editing}
+          onClose={(changedId) => { setParam('edit', null); if (changedId) redo(changedId); }}
+          onDeleted={(id) => { setParam('edit', null); forget(id); }} />
+      )}
     </div>
   );
 }
