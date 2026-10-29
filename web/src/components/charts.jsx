@@ -15,6 +15,16 @@ const compact = (v) => {
   return `${v < 0 ? '\u2212' : ''}₹${body}`;
 };
 
+// Time-axis ticks: months over a long range, days over a short one, so a
+// month name never repeats along the axis.
+const spanDays = (curve) => (curve.length > 1 ? (ts(curve.at(-1).date) - ts(curve[0].date)) / 864e5 : 0);
+const tickMs = (curve) => (spanDays(curve) > 75 ? 28 : spanDays(curve) > 21 ? 7 : 1) * 864e5;
+const dateTick = (curve) => (v) => {
+  const d = new Date(v);
+  if (spanDays(curve) <= 75) return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  return d.getUTCMonth() === 0 ? `Jan '${String(d.getUTCFullYear()).slice(2)}` : MONTHS[d.getUTCMonth()];
+};
+
 // Equity: stepped accent line over a soft area; drawdown below in its own
 // 60-px pane, peak to trough, in loss red.
 export function EquityChart({ curve, height = 300 }) {
@@ -40,8 +50,8 @@ export function EquityChart({ curve, height = 300 }) {
       xAxis: [
         { type: 'time', gridIndex: 0, ...ax, axisLabel: { show: false }, splitLine: { show: false } },
         {
-          type: 'time', gridIndex: 1, ...ax, splitLine: { show: false },
-          axisLabel: { ...ax.axisLabel, formatter: (v) => { const d = new Date(v); return d.getUTCMonth() === 0 ? `Jan '${String(d.getUTCFullYear()).slice(2)}` : MONTHS[d.getUTCMonth()]; } },
+          type: 'time', gridIndex: 1, ...ax, splitLine: { show: false }, minInterval: tickMs(curve),
+          axisLabel: { ...ax.axisLabel, hideOverlap: true, formatter: dateTick(curve) },
         },
       ],
       yAxis: [
@@ -148,8 +158,8 @@ export function EquityOverlay({ lines, height = 300 }) {
       ...baseOption(c),
       grid: { left: 64, right: 16, top: 12, bottom: 28 },
       xAxis: {
-        type: 'time', ...ax, splitLine: { show: false },
-        axisLabel: { ...ax.axisLabel, formatter: (v) => { const d = new Date(v); return d.getUTCMonth() === 0 ? `Jan '${String(d.getUTCFullYear()).slice(2)}` : MONTHS[d.getUTCMonth()]; } },
+        type: 'time', ...ax, splitLine: { show: false }, minInterval: tickMs(lines[0]?.curve || []),
+        axisLabel: { ...ax.axisLabel, hideOverlap: true, formatter: dateTick(lines[0]?.curve || []) },
       },
       yAxis: { type: 'value', ...ax, axisLabel: { ...ax.axisLabel, formatter: compact } },
       tooltip: {
