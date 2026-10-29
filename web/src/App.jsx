@@ -14,6 +14,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const NewBacktest = lazy(() => import('./pages/NewBacktest.jsx'));
 const RunProgress = lazy(() => import('./pages/RunProgress.jsx'));
 const Runs = lazy(() => import('./pages/Runs.jsx'));
+const Research = lazy(() => import('./pages/Research.jsx'));
 const TickerDetail = lazy(() => import('./pages/TickerDetail.jsx'));
 const Compare = lazy(() => import('./pages/Compare.jsx'));
 const Watchlists = lazy(() => import('./pages/Watchlists.jsx'));
@@ -41,8 +42,7 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
-        {/* Research is the Runs list until its own screen lands (#88). */}
-        <Route path="research" element={<Runs />} />
+        <Route path="research" element={<Research />} />
         <Route path="runs" element={<Runs />} />
         <Route path="runs/:id" element={<Dashboard />} />
         <Route path="runs/:id/progress" element={<RunProgress />} />
