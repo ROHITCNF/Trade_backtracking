@@ -11,15 +11,19 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { connectFyers } from '../lib/me.jsx';
 import { dateLong, dateShort, pctReturn, pnl, price, qty, rMultiple, rupees, tone } from '../lib/format.js';
-import { runTitle, settingsLabel } from '../lib/runs.js';
+import { settingsLabel } from '../lib/runs.js';
+import { cardTitle, isJournalRun } from '../lib/research.js';
+import { journalListId } from '../lib/journal.js';
+import { dailyCurve } from '../lib/summary.js';
 import { EquityChart } from '../components/charts.jsx';
-import MetricCards from '../components/MetricCards.jsx';
+import { Narrative, StatTiles } from '../components/Summary.jsx';
 import TradeChart from '../components/TradeChart.jsx';
 import Icon from '../components/Icon.jsx';
 import Segmented from '../components/Segmented.jsx';
 import { useNarrow } from '../lib/useMedia.js';
 
 const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
+const TRADES_SHOWN = 30;
 const candleCache = new Map(); // trade id -> response, for this browser session
 
 function useCandles(tradeId, attempt) {
@@ -179,6 +183,7 @@ export default function TickerDetail() {
   const [error, setError] = useState(null);
   const narrow = useNarrow();
   const [view, setView] = useState('trade'); // left card while a trade is open: 'equity' | 'trade'
+  const [allTrades, setAllTrades] = useState(false);
 
   useEffect(() => {
     const q = `symbols=${encodeURIComponent(symbol)}`;
@@ -204,6 +209,10 @@ export default function TickerDetail() {
   const name = analysis.symbols[0]?.name;
   const trade = index >= 0 ? trades[index] : null;
   const showTrade = trade && view === 'trade';
+  const shownTrades = allTrades || index >= TRADES_SHOWN ? trades : trades.slice(0, TRADES_SHOWN);
+  // Back to where the run is read: the Journal for a Journal run, else Research.
+  const journal = isJournalRun(run);
+  const back = journal ? { to: `/?list=${journalListId(run)}`, label: 'Journal' } : { to: `/research?run=${run.id}`, label: 'Research' };
 
   if (trade && narrow) {
     return (
@@ -221,7 +230,7 @@ export default function TickerDetail() {
 
   return (
     <div className="stack">
-      <div className="breadcrumb"><Link to="/runs">Runs</Link> / <Link to={`/runs/${run.id}`}>{runTitle(run)}</Link> / {short(symbol)}</div>
+      <div className="breadcrumb"><Link to={back.to.split('?')[0]}>{back.label}</Link> / <Link to={back.to}>{cardTitle(run)}</Link> / {short(symbol)}</div>
       <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
           <div className="row" style={{ alignItems: 'baseline' }}>
@@ -230,14 +239,15 @@ export default function TickerDetail() {
           </div>
           <p className="caption" style={{ fontSize: 13.5, margin: '4px 0 0' }}>{settingsLabel(run.config)} · {dateShort(run.fromDate)} → {dateShort(run.toDate)}</p>
         </div>
-        <Link className="btn" to={`/runs/${run.id}`}>‹ Back to run</Link>
+        <Link className="btn" to={back.to}>‹ Back to {journal ? 'Journal' : 'results'}</Link>
       </div>
 
       {trades.length === 0 ? (
         <div className="card empty"><h2 className="title">No trades for {short(symbol)} in this run</h2><p>It never broke out of its opening range in the selected dates, or its fetch failed.</p></div>
       ) : (
         <>
-          <MetricCards analysis={analysis} />
+          <Narrative analysis={analysis} className="narrative-lg" />
+          <StatTiles metrics={analysis.metrics} />
           <div className={`ticker-layout${trade ? ' with-panel' : ''}`}>
             <div className="stack" style={{ minWidth: 0 }}>
               <section className="card chart-card">
@@ -253,7 +263,7 @@ export default function TickerDetail() {
                 </div>
                 {showTrade
                   ? <TradeDayChart key={trade.id} trade={trade} orbEnd={run.config.orbEnd} height={420} />
-                  : <EquityChart curve={analysis.metrics.curve} height={300} />}
+                  : <EquityChart curve={dailyCurve(analysis.metrics.curve)} height={300} />}
               </section>
               <section className="card" style={{ padding: 0 }}>
                 <div className="row" style={{ padding: 'var(--s-3) var(--s-4)' }}>
@@ -269,7 +279,7 @@ export default function TickerDetail() {
                       </tr>
                     </thead>
                     <tbody>
-                      {trades.map((t) => (
+                      {shownTrades.map((t) => (
                         <tr key={t.id} className={`clickable${t.id === selectedId ? ' selected' : ''}`} onClick={() => select(t.id)}>
                           <td><span className="accent-link">{dateShort(t.date)}</span></td>
                           <td>{t.side === 'long' ? 'Long' : 'Short'}</td>
@@ -289,6 +299,9 @@ export default function TickerDetail() {
                     </tbody>
                   </table>
                 </div>
+                {shownTrades.length < trades.length && (
+                  <button className="btn btn-ghost show-all" onClick={() => setAllTrades(true)}>Show all {trades.length} trades</button>
+                )}
               </section>
             </div>
             {trade ? (

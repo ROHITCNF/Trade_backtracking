@@ -7,12 +7,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { dateLong, dateShort, pnl, profitFactor, qty, rate, rMultiple, tone } from '../lib/format.js';
+import { dateLong, dateShort, pnl, profitFactor, qty, rMultiple, tone } from '../lib/format.js';
 import { settingsLabel } from '../lib/runs.js';
 import { cardTitle, sameStrategy } from '../lib/research.js';
 import { dailyCurve, tradingDays } from '../lib/summary.js';
 import { EquityChart, PnlBars, Sparkline } from './charts.jsx';
-import { LongShort, Narrative, TradesEnded } from './Summary.jsx';
+import { LongShort, Narrative, StatTiles, TradesEnded } from './Summary.jsx';
 import Icon from './Icon.jsx';
 
 const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
@@ -189,14 +189,7 @@ export default function RunResults({ run, strategy }) {
             <div className="banner banner-row"><Icon name="warn" /><span><b>{analysis.portfolio.bestSymbol} carries {Math.round(analysis.portfolio.topShare)}% of the P&amp;L.</b> <span className="warn">Check one name isn’t the whole result.</span></span></div>
           )}
 
-          <div className="tiles">
-            <div className="tile"><span className="label">Net P&amp;L</span><span className={`stat ${tone(m.totalPnl)}`}>{pnl(m.totalPnl)}</span></div>
-            <div className="tile"><span className="label">Trades</span><span className="stat">{qty(m.totalTrades)}</span></div>
-            <div className="tile"><span className="label">Win rate</span><span className="stat">{rate(m.winRate)}</span></div>
-            <div className="tile"><span className="label">Profit factor</span><span className="stat">{profitFactor(m.profitFactor)}</span></div>
-            <div className="tile"><span className="label">Avg R</span><span className={`stat ${tone(m.avgR)}`}>{rMultiple(m.avgR)}</span></div>
-            <div className="tile"><span className="label">Max drawdown</span><span className={`stat ${tone(-m.maxDrawdown)}`}>{pnl(-m.maxDrawdown)}</span></div>
-          </div>
+          <StatTiles metrics={m} />
 
           <div className="summary-grid">
             <LongShort analysis={analysis} />

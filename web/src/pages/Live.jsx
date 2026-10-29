@@ -214,7 +214,7 @@ export default function Live() {
       <div className="row page-head" style={{ alignItems: 'flex-end' }}>
         <div className="spacer">
           <h1 className="display">Live paper</h1>
-          <p className="caption" style={{ fontSize: 13.5, margin: '4px 0 0' }}>
+          <p className="page-sub">
             {status.watchlist ? `Watchlist “${status.watchlist}” · ` : ''}
             {sessionLabel(status)} · no orders are placed
           </p>
@@ -235,7 +235,7 @@ export default function Live() {
       {pick && <TradeDay key={keyOf(pick)} trade={pick} onClose={() => setSelected(null)} />}
 
       <section className="stack">
-        <h2 className="title">Today · {dateShort(today)}</h2>
+        <h2 className="title-lg">Today · {dateShort(today)}</h2>
         {todays.length ? (
           <TradesTable trades={todays} selected={selected} onSelect={select} />
         ) : (
@@ -244,7 +244,7 @@ export default function Live() {
       </section>
 
       <section className="stack">
-        <h2 className="title">History</h2>
+        <h2 className="title-lg">History</h2>
         {rows.length > 0 && (
           <div className="card">
             <PnlBars rows={rows} label={(r) => dateShort(r.key)} />
