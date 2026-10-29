@@ -2,7 +2,7 @@
 // one-line narrative, Long vs short, and How trades ended. `analysis` is a
 // /api/runs/:id/analysis response (any filters).
 
-import { pnl, profitFactor, qty, tone } from '../lib/format.js';
+import { pnl, profitFactor, qty, rate, rMultiple, tone } from '../lib/format.js';
 import { narrative, sideBars } from '../lib/summary.js';
 
 const REASON_LABEL = { TARGET: 'Target', SL: 'Stop loss', EOD: 'End of day' };
@@ -13,6 +13,20 @@ export function Narrative({ analysis, className = '' }) {
     <p className={`narrative ${className}`}>
       {narrative(analysis).map((p, i) => (p.tone ? <b key={i} className={p.tone}>{p.text}</b> : <span key={i}>{p.text}</span>))}
     </p>
+  );
+}
+
+// The six v2 stat tiles: Net P&L, Trades, Win rate, PF, Avg R, Max drawdown.
+export function StatTiles({ metrics: m }) {
+  return (
+    <div className="tiles">
+      <div className="tile"><span className="label">Net P&amp;L</span><span className={`stat ${tone(m.totalPnl)}`}>{pnl(m.totalPnl)}</span></div>
+      <div className="tile"><span className="label">Trades</span><span className="stat">{qty(m.totalTrades)}</span></div>
+      <div className="tile"><span className="label">Win rate</span><span className="stat">{rate(m.winRate)}</span></div>
+      <div className="tile"><span className="label">Profit factor</span><span className="stat">{profitFactor(m.profitFactor)}</span></div>
+      <div className="tile"><span className="label">Avg R</span><span className={`stat ${tone(m.avgR)}`}>{rMultiple(m.avgR)}</span></div>
+      <div className="tile"><span className="label">Max drawdown</span><span className={`stat ${tone(-m.maxDrawdown)}`}>{pnl(-m.maxDrawdown)}</span></div>
+    </div>
   );
 }
 
