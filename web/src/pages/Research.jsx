@@ -12,7 +12,7 @@ import { defaultTo, earliestFrom, istToday, rangeFor } from '../lib/dates.js';
 import { isActive, settingsLabel } from '../lib/runs.js';
 import { useEstimate } from '../lib/useEstimate.js';
 import {
-  cardTitle, defaultStrategy, progressFacts, researchDraft, researchRuns, sameStrategy, strategyOf, weekdaysBetween,
+  allRuns, cardTitle, defaultStrategy, progressFacts, researchDraft, researchRuns, sameStrategy, strategyOf, weekdaysBetween,
 } from '../lib/research.js';
 import Segmented from '../components/Segmented.jsx';
 import SymbolSearch from '../components/SymbolSearch.jsx';
@@ -354,7 +354,8 @@ export default function Research() {
 
   if (error) return <div className="banner banner-error">{error}</div>;
   if (!data || !form) return <p className="placeholder">Loading…</p>;
-  const selected = runs.find((r) => r.id === selectedId) || null;
+  // A Journal run has no card, but the Journal links its trades here.
+  const selected = runs.find((r) => r.id === selectedId) || allRuns(data.items).find((r) => r.id === selectedId) || null;
 
   return (
     <div className="stack research">

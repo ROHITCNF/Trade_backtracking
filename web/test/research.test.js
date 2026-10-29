@@ -37,6 +37,7 @@ test('strategy comparison ignores text vs number', () => {
 test('card titles: name, else list', () => {
   assert.equal(cardTitle(run({ name: 'SBIN', watchlistName: null })), 'SBIN');
   assert.equal(cardTitle(run()), 'core');
+  assert.equal(cardTitle(run({ name: 'Journal · 1' })), 'core · Journal');
 });
 
 test('weekdays in a range', () => {

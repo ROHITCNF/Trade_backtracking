@@ -73,3 +73,19 @@ test('compact cell amounts', () => {
   assert.equal(compactPnl(23000), '+23.0k');
   assert.equal(compactPnl(0), '0');
 });
+
+test('relative day names', async () => {
+  const { relativeDay } = await import('../src/lib/journal.js');
+  assert.equal(relativeDay('2026-10-29', '2026-10-29'), 'Today');
+  assert.equal(relativeDay('2026-10-28', '2026-10-29'), 'Yesterday');
+  assert.equal(relativeDay('2026-10-30', '2026-11-02'), 'Yesterday'); // Mon → Fri
+  assert.equal(relativeDay('2026-10-27', '2026-10-29'), '');
+});
+
+test('top movers: winners biggest first, losers worst first', async () => {
+  const { topMovers } = await import('../src/lib/journal.js');
+  const t = (symbol, pnl) => ({ symbol, pnl });
+  const { best, worst } = topMovers([t('A', 745), t('B', -498), t('C', 0), t('D', 742), t('E', -492), t('F', 745.5), t('G', 10)], 3);
+  assert.deepEqual(best.map((x) => x.symbol), ['F', 'A', 'D']);
+  assert.deepEqual(worst.map((x) => x.symbol), ['B', 'E']);
+});

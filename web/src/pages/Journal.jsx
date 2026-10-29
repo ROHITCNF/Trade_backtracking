@@ -1,6 +1,7 @@
 // Journal (v2/Journal — desktop.png, mobile.png): every list's ORB result per
 // day, kept current by Journal runs (decisions D16–D18). The 20-day heatmap
-// picks a day (?day=); the day itself is shown below it.
+// picks a day (?day=); below it, that day per list, with one list (?list=)
+// opened up.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { compactPnl, heatmap, HEATMAP_DAYS } from '../lib/journal.js';
 import { useJournal } from '../lib/useJournal.js';
 import StrategyFields from '../components/StrategyFields.jsx';
 import Icon from '../components/Icon.jsx';
+import JournalDay from '../components/JournalDay.jsx';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -173,6 +175,11 @@ export default function Journal() {
   const dates = heatmap(data.rows).dates;
   const day = params.get('day') && dates.includes(params.get('day')) ? params.get('day') : dates.at(-1) || null;
   const calls = data.lists.reduce((a, w) => a + w.count, 0);
+  const setParam = (key, value) => {
+    const next = new URLSearchParams(params);
+    next.set(key, String(value));
+    setParams(next, { replace: true });
+  };
 
   return (
     <div className="stack journal">
@@ -188,7 +195,9 @@ export default function Journal() {
       </div>
       {editing && <StrategyPanel strategy={data.strategy} calls={calls} onApply={applyStrategy} onClose={() => setEditing(false)} />}
       <UpdateNote data={data} queueError={queueError} canQueue={canQueue} onRetry={retry} />
-      <Heatmap data={data} day={day} onDay={(d) => setParams({ day: d }, { replace: true })} />
+      <Heatmap data={data} day={day} onDay={(d) => setParam('day', d)} />
+      <JournalDay state={data.state} dates={dates} day={day} onDay={(d) => setParam('day', d)}
+        listId={Number(params.get('list')) || null} onList={(id) => setParam('list', id)} />
     </div>
   );
 }

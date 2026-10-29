@@ -96,3 +96,17 @@ export function compactPnl(n) {
   const a = Math.abs(n);
   return a >= 1000 ? `${sign}${(a / 1000).toFixed(1)}k` : `${sign}${Math.round(a)}`;
 }
+
+// "Today" / "Yesterday" (the last trading day before today) / "" for older days.
+export function relativeDay(day, today = istToday()) {
+  if (day === today) return 'Today';
+  return day === lastTradingDay(today) ? 'Yesterday' : '';
+}
+
+// The day's best and worst trades: up to n winners, biggest first, and n
+// losers, worst first. A flat trade is neither.
+export function topMovers(trades, n = 3) {
+  const best = trades.filter((t) => t.pnl > 0).sort((a, b) => b.pnl - a.pnl).slice(0, n);
+  const worst = trades.filter((t) => t.pnl < 0).sort((a, b) => a.pnl - b.pnl).slice(0, n);
+  return { best, worst };
+}

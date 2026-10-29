@@ -37,8 +37,9 @@ export function defaultStrategy(items, fallback) {
   return strategyOf(journal ? journal.config : fallback);
 }
 
-// What a card is called: its name ("final (5 of 18)", "SBIN"), else the list.
-export const cardTitle = (run) => run.name || run.watchlistName || runTitle(run);
+// What a run is called: its name ("final (5 of 18)", "SBIN"), else the list;
+// a Journal run by its list ("core · Journal").
+export const cardTitle = (run) => (isJournalRun(run) ? `${run.watchlistName} · Journal` : run.name || run.watchlistName || runTitle(run));
 
 // Weekdays in the range, inclusive. Holidays are ignored (#69), so this is an
 // upper bound on trading days.
