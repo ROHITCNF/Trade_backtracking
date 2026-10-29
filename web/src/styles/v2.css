@@ -1,0 +1,63 @@
+/* v2 screens (docs/design/reference/v2/): Journal and Research. Same tokens
+   and primitives as base.css; only what the v2 layouts add. */
+
+.display { font-size: 24px; line-height: 30px; }
+.page-sub { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; }
+
+/* Research launcher bar */
+.research-bar { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); }
+.research-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
+.research-row select.input { min-width: 130px; }
+.research-row .search { width: 320px; }
+.research-estimate { font-size: 12.5px; text-align: right; }
+.strategy-pill {
+  font: inherit; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; height: 32px; padding: 0 12px;
+  border: 1px dashed var(--line-strong); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); cursor: pointer;
+}
+.strategy-pill .accent-link { text-decoration: underline; }
+.strategy-pill.on { border-style: solid; border-color: var(--accent); }
+.research-strategy { border-top: 1px solid var(--line); padding-top: var(--s-3); display: flex; flex-direction: column; gap: var(--s-3); }
+.strategy-fields { display: flex; flex-direction: column; gap: var(--s-3); }
+.strategy-fields .fields { gap: var(--s-3); }
+.chip-lg { height: 32px; font-size: 13px; }
+
+.subset { position: relative; }
+.select-btn { display: inline-flex; align-items: center; gap: var(--s-2); cursor: pointer; min-width: 150px; justify-content: space-between; }
+.subset-menu { position: absolute; z-index: 20; top: 38px; left: 0; width: 260px; display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-3);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 12%, transparent); }
+.subset-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.subset-list label { display: flex; align-items: center; gap: var(--s-2); padding: 3px 2px; cursor: pointer; }
+
+/* Research result cards */
+.result-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--s-3); }
+.result-card {
+  position: relative; display: flex; flex-direction: column; gap: 4px; padding: var(--s-3) var(--s-4); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0;
+}
+.result-card:hover { border-color: var(--line-strong); }
+.result-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.result-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.result-card-top { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.result-card-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-card .btn-sm { align-self: flex-start; margin-top: 4px; }
+.result-card .progress { margin-top: 4px; }
+.card-menu { position: relative; }
+.card-menu > .link-btn { font-size: 18px; line-height: 1; padding: 0 2px; color: var(--ink-3); }
+.card-menu-list { position: absolute; right: 0; top: 22px; z-index: 15; display: flex; flex-direction: column; padding: 4px; min-width: 170px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 12%, transparent); }
+.card-menu-list button { font: inherit; text-align: left; border: 0; background: none; color: var(--ink); padding: 6px 8px; border-radius: var(--r-control); cursor: pointer; }
+.card-menu-list button:hover { background: var(--surface-2); }
+.card-menu-list button.loss { color: var(--loss); }
+.card-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); font-size: 12.5px; }
+
+@media (max-width: 720px) {
+  .research-row > * { flex: 1 1 auto; }
+  .research-row .segmented { flex: 0 0 auto; }
+  .research-row .search { width: 100%; }
+  .research-row > .spacer { display: none; }
+  .research-estimate { text-align: left; flex-basis: 100%; }
+  .research-row .btn-primary { flex-basis: 100%; justify-content: center; height: 40px; }
+  .result-cards { grid-template-columns: 1fr; }
+}
+.result-card-top > b:not(.result-card-title) { white-space: nowrap; flex: none; }
+.result-card-top .status { flex: none; }
