@@ -1,24 +1,26 @@
-// Live paper trading (M6, D22): the API's scheduler state and the paper trades
-// it recorded, seen through one watchlist over a chosen range. Nothing here
-// places orders; the session runs inside the API (api/live.js) and this page
-// only reads what it recorded. It opens on the last trading day and never
-// moves on its own: Refresh picks up new trades. Clicking a trade loads that
-// day's candles from Fyers (one call, not stored).
+// Live paper trading (M6, D22, D23; docs/design/reference/live): the API's
+// scheduler state and the paper trades it recorded, seen through one
+// watchlist over a chosen range, as a trade list beside one trade's chart.
+// Nothing here places orders; the session runs inside the API (api/live.js).
+// The page opens on the last trading day and never moves on its own: Refresh
+// picks up new trades. Opening a trade loads its day's candles from Fyers
+// (one call, kept for the visit so paging back costs nothing).
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { connectFyers } from '../lib/me.jsx';
 import { istToday } from '../lib/dates.js';
-import { dateLong, dateShort, pnl, price, qty, rate, tone } from '../lib/format.js';
-import { RANGES, dailyRows, defaultWatchlist, liveNotice, liveRange, reconLabel, sessionLabel } from '../lib/live.js';
-import { PnlBars } from '../components/charts.jsx';
+import { dateLong, dateShort, pnl, qty, rate, tone } from '../lib/format.js';
+import { RANGES, dailyRows, defaultWatchlist, liveNotice, liveRange, sessionHeader } from '../lib/live.js';
+import { buildRows, reviewCounts, sortRows, tabRows } from '../lib/liveView.js';
+import { useNarrow } from '../lib/useMedia.js';
 import { Stat } from '../components/Stat.jsx';
-import TradeChart from '../components/TradeChart.jsx';
 import Segmented from '../components/Segmented.jsx';
 import Icon from '../components/Icon.jsx';
+import LiveList from '../components/LiveList.jsx';
+import LiveTrade from '../components/LiveTrade.jsx';
 
-const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
-const keyOf = (t) => `${t.date}|${t.symbol}`;
+const WINDOWS = [['trade', 'Trade window'], ['full', 'Full day']];
 
 function Notice({ notice }) {
   if (!notice) return null;
@@ -35,162 +37,59 @@ function Notice({ notice }) {
   );
 }
 
-function TradeDay({ trade, onClose }) {
-  const [state, setState] = useState({ loading: true });
-  useEffect(() => {
-    let cancelled = false;
-    setState({ loading: true });
-    api(`/api/paper-trades/${trade.date}/${encodeURIComponent(trade.symbol)}/candles`).then(
-      (data) => !cancelled && setState({ data }),
-      (error) => !cancelled && setState({ error })
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [trade.date, trade.symbol, trade.status]);
-
+function CheckStat({ counts, checkedDays, onShow }) {
+  if (!checkedDays) return <Stat label="Checked against backtest" value="Not yet" sub="checked after each close" />;
+  if (!counts.review) return <Stat label="Checked against backtest" value="All match" className="profit" sub={`${qty(checkedDays)} day${checkedDays === 1 ? '' : 's'} checked`} />;
   return (
-    <div className="card stack">
-      <div className="row">
-        <span className="title">{short(trade.symbol)}</span>
-        <span className="tag">{trade.side === 'long' ? 'Long' : 'Short'}</span>
-        {trade.status === 'open' ? <span className="tag">Open</span> : <b className={`title ${tone(trade.pnl)}`}>{pnl(trade.pnl)}</b>}
-        <span className="caption">{dateLong(trade.date)}</span>
-        <span className="spacer" />
-        <button className="btn icon-btn" aria-label="Close chart" onClick={onClose}>×</button>
-      </div>
-      {state.loading && <p className="placeholder">Loading 1-minute candles from Fyers…</p>}
-      {state.error && (
-        <div className="chart-state chart-state-box">
-          <b>{state.error.status === 409 ? 'Connect Fyers to load the chart' : 'The chart didn’t load'}</b>
-          <span className="caption">
-            {state.error.status === 409 ? 'Candles are fetched from the broker on demand. The trade’s numbers below don’t need it.' : state.error.message}
-          </span>
-          {state.error.status === 409 && <button className="btn btn-primary" onClick={() => connectFyers()}>Connect Fyers</button>}
-        </div>
-      )}
-      {state.data && <TradeChart candles={state.data.candles} trade={state.data.trade} orbEnd={state.data.orbEnd} height={320} />}
+    <div className="stat-card">
+      <span className="label">Checked against backtest</span>
+      <span className="stat warn">{qty(counts.review)} to review</span>
+      <button type="button" className="link-btn accent caption live-show" onClick={onShow}>
+        {counts.differ} differ · {counts.missed} missed — show
+      </button>
     </div>
-  );
-}
-
-function TradesTable({ trades, selected, onSelect, showDate }) {
-  return (
-    <div className="card table-wrap" style={{ padding: 0 }}>
-      <table className="data">
-        <thead>
-          <tr>
-            {showDate && <th>Date</th>}
-            <th>Symbol</th>
-            <th>Side</th>
-            <th>Entry</th>
-            <th className="num">Price</th>
-            <th className="num">SL</th>
-            <th className="num">Target</th>
-            <th>Exit</th>
-            <th className="num">Price</th>
-            <th>Reason</th>
-            <th className="num">Qty</th>
-            <th className="num">P&amp;L</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((t) => (
-            <tr key={keyOf(t)} className={`clickable${selected === keyOf(t) ? ' selected' : ''}`} onClick={() => onSelect(keyOf(t))}>
-              {showDate && <td className="nowrap">{dateShort(t.date)}</td>}
-              <td><b>{short(t.symbol)}</b>{t.source === 'backtest' && <span className="cell-sub">backfilled</span>}</td>
-              <td>{t.side === 'long' ? 'Long' : 'Short'}</td>
-              <td>{t.entryTime}</td>
-              <td className="num">{price(t.entry)}</td>
-              <td className="num">{price(t.sl)}</td>
-              <td className="num">{price(t.target)}</td>
-              <td>{t.status === 'open' ? <span className="tag">Open</span> : t.exitTime}</td>
-              <td className="num">{price(t.exit)}</td>
-              <td>{t.reason ?? '—'}</td>
-              <td className="num">{qty(t.quantity)}</td>
-              <td className={`num ${tone(t.pnl)}`}>{pnl(t.pnl)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// After each close the API re-runs the day as a backtest; live and backtest
-// must agree exactly. A mismatch is a plumbing bug worth opening.
-function Reconciliations({ items, onRecheck, busy }) {
-  if (!items.length) return null;
-  return (
-    <section className="stack">
-      <h2 className="title">Checked against backtest</h2>
-      <div className="card table-wrap" style={{ padding: 0 }}>
-        <table className="data">
-          <thead>
-            <tr><th>Date</th><th>Result</th><th>Details</th><th /></tr>
-          </thead>
-          <tbody>
-            {items.map((r) => {
-              const v = reconLabel(r);
-              return (
-                <tr key={r.date}>
-                  <td className="nowrap">{dateShort(r.date)}</td>
-                  <td className={`nowrap ${v.tone}`}><b>{v.text}</b></td>
-                  <td>
-                    {r.mismatches.length === 0
-                      ? <span className="caption">{r.backfilled ? 'Live didn’t run; trades filled in from the backtest.' : 'Every symbol agrees.'}</span>
-                      : r.mismatches.map((m) => <div key={m.symbol} className="caption"><b>{short(m.symbol)}</b> · {m.problem}</div>)}
-                  </td>
-                  <td className="num"><button className="btn" disabled={busy === r.date} onClick={() => onRecheck(r.date)}>{busy === r.date ? 'Checking…' : 'Re-check'}</button></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-// "8 of 95 symbols in core aren't traded live" — those never get a paper trade.
-function Coverage({ coverage }) {
-  if (!coverage?.missing.length) return null;
-  const { missing, symbols, watchlist } = coverage;
-  const shown = missing.slice(0, 8).map(short).join(', ');
-  return (
-    <p className="caption">
-      {qty(missing.length)} of {qty(symbols)} symbols in “{watchlist.name}” aren’t traded live, so they have no paper trades:{' '}
-      {shown}{missing.length > 8 ? `, +${missing.length - 8} more` : ''}.
-    </p>
   );
 }
 
 export default function Live() {
+  const narrow = useNarrow();
   const [status, setStatus] = useState(null);
   const [lists, setLists] = useState(null);
   const [listId, setListId] = useState(null);
+  const [symbols, setSymbols] = useState(null);
   const [range, setRange] = useState('day');
+  const [date, setDate] = useState(null);
+  const [picked, setPicked] = useState(false); // the user chose the Date; Refresh keeps it
   const [custom, setCustom] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [tab, setTab] = useState('traded');
+  const [sortBy, setSortBy] = useState('time');
   const [selected, setSelected] = useState(null);
-  const [rechecking, setRechecking] = useState(null);
+  const [open, setOpen] = useState(false); // phone: showing one trade instead of the list
+  const [win, setWin] = useState('trade');
+  const [charts, setCharts] = useState({});
+  const [rechecking, setRechecking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tick, setTick] = useState(0); // bumped by Refresh to re-read trades
   const latest = useRef(0); // only the newest trades request may land
+  const loading = useRef(new Set());
   const today = istToday();
 
   // Status (and with it the last trading day) is read on open and on Refresh
   // only, so the page never jumps to a new day by itself.
   const loadStatus = useCallback(async () => {
     const [s, { watchlists }] = await Promise.all([api('/api/live/status'), api('/api/watchlists')]);
+    const last = s.lastTradeDate || s.today;
     setStatus(s);
     setLists(watchlists);
     setListId((cur) => cur ?? defaultWatchlist(watchlists));
-    setCustom((cur) => cur ?? { from: s.lastTradeDate || s.today, to: s.lastTradeDate || s.today });
-  }, []);
+    setDate((cur) => (picked && cur ? cur : last));
+    setCustom((cur) => cur ?? { from: last, to: last });
+  }, [picked]);
 
-  const { from, to } = status && custom ? liveRange(range, { today, lastTradeDate: status.lastTradeDate, custom }) : {};
+  const { from, to } = date && custom ? liveRange(range, { date, custom }) : {};
+  const oneDay = Boolean(from) && from === to;
 
   const loadTrades = useCallback(async () => {
     if (!from || !to) return;
@@ -208,16 +107,58 @@ export default function Live() {
 
   useEffect(() => {
     loadStatus().catch((err) => setError(err.message));
-  }, [loadStatus]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadTrades();
   }, [loadTrades]);
 
+  // The list's symbols, for the "All" tab's untraded rows.
+  useEffect(() => {
+    if (!listId) return;
+    let cancelled = false;
+    api(`/api/watchlists/${listId}`).then(
+      (d) => !cancelled && setSymbols((d.symbols || []).map((s) => (typeof s === 'string' ? s : s.symbol))),
+      () => !cancelled && setSymbols(null)
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [listId]);
+
+  const rows = useMemo(
+    () => (data ? buildRows({ trades: data.trades, reconciliations: data.reconciliations, symbols, missing: data.coverage?.missing, oneDay, date: from }) : []),
+    [data, symbols, oneDay, from]
+  );
+  const tabs = [
+    ['traded', 'Traded', tabRows(rows, 'traded').length],
+    ...(oneDay ? [['all', 'All', rows.length]] : []),
+    ['review', 'Review', tabRows(rows, 'review').length],
+  ];
+  const shownTab = tabs.some(([v]) => v === tab) ? tab : 'traded';
+  const visibleRows = useMemo(() => sortRows(tabRows(rows, shownTab), sortBy), [rows, shownTab, sortBy]);
+  const clickable = visibleRows.filter((r) => r.kind !== 'none');
+  const current = clickable.find((r) => r.key === selected) || (narrow ? null : clickable[0]) || null;
+  const at = current ? clickable.indexOf(current) : -1;
+
+  // One Fyers call per paper trade opened, kept for the visit.
+  useEffect(() => {
+    const t = current?.trade;
+    if (!t || charts[current.key] || loading.current.has(current.key)) return;
+    const key = current.key;
+    loading.current.add(key);
+    setCharts((c) => ({ ...c, [key]: { loading: true } }));
+    api(`/api/paper-trades/${t.date}/${encodeURIComponent(t.symbol)}/candles`).then(
+      (d) => setCharts((c) => ({ ...c, [key]: { data: d } })),
+      (err) => setCharts((c) => ({ ...c, [key]: { error: err } }))
+    ).finally(() => loading.current.delete(key));
+  }, [current, charts]);
+
   async function refresh() {
     setRefreshing(true);
     try {
       await loadStatus();
+      setCharts((c) => Object.fromEntries(Object.entries(c).filter(([k]) => !k.startsWith(`${today}|`)))); // today's candles move
       setTick((n) => n + 1);
     } catch (err) {
       setError(err.message);
@@ -225,55 +166,111 @@ export default function Live() {
     setRefreshing(false);
   }
 
-  async function recheck(date) {
-    setRechecking(date);
+  async function recheck() {
+    setRechecking(true);
     try {
-      await api(`/api/paper-trades/${date}/reconcile`, { method: 'POST' });
-      await loadTrades();
+      await api(`/api/paper-trades/${from}/reconcile`, { method: 'POST' });
+      setTick((n) => n + 1);
     } catch (err) {
       setError(err.message);
     }
-    setRechecking(null);
+    setRechecking(false);
   }
 
-  // Editing a date makes the range custom, starting from what is shown.
-  function pickDate(key, value) {
-    if (!value) return;
-    setCustom({ from, to, [key]: value });
-    setRange('custom');
-  }
+  const select = (key) => {
+    setSelected(key);
+    setOpen(true);
+  };
+  const step = (d) => {
+    const next = clickable[at + d];
+    if (!next) return;
+    setSelected(next.key);
+    if (narrow) window.scrollTo(0, 0);
+  };
 
   if (error && !data) return <div className="banner banner-error">{error}</div>;
   if (!data || !status || !lists) return <p className="placeholder">Loading live paper trading…</p>;
 
-  const oneDay = from === to;
-  const pick = data.trades.find((t) => keyOf(t) === selected);
-  const select = (k) => setSelected((cur) => (cur === k ? null : k));
-  const rows = dailyRows(data.trades);
+  const head = sessionHeader(status);
   const { summary } = data;
+  const days = dailyRows(data.trades);
+  const counts = reviewCounts(rows);
   const span = oneDay ? dateLong(from) : `${dateShort(from)} – ${dateShort(to)}`;
+  const afterClose = from < today || status.session === null;
+
+  const nav = (
+    <div className="row live-nav">
+      <button className="btn icon-btn" aria-label="Previous trade" disabled={at <= 0} onClick={() => step(-1)}>‹</button>
+      <button className="btn icon-btn" aria-label="Next trade" disabled={at < 0 || at >= clickable.length - 1} onClick={() => step(1)}>›</button>
+    </div>
+  );
+  const panel = current && (
+    <LiveTrade key={current.key} row={current} chart={charts[current.key]} window={win} onWindow={setWin} nav={nav} narrow={narrow} />
+  );
+
+  // Phone, one trade open: its own screen with Previous / Next at the bottom.
+  if (narrow && open && current) {
+    return (
+      <div className="stack live-mobile-trade">
+        <div className="row">
+          <button className="link-btn accent live-back" onClick={() => setOpen(false)}>‹ All trades</button>
+          <span className="spacer" />
+          {current.trade && <Segmented label="Chart window" value={win} options={WINDOWS} onChange={setWin} />}
+        </div>
+        {panel}
+        <div className="live-pager">
+          <button className="btn btn-lg" disabled={at <= 0} onClick={() => step(-1)}>‹ Previous</button>
+          <button className="btn btn-lg btn-primary" disabled={at >= clickable.length - 1} onClick={() => step(1)}>Next ›</button>
+        </div>
+      </div>
+    );
+  }
+
+  const footer = (
+    <>
+      {shownTab === 'all' && data.coverage?.missing.length > 0 && (
+        <p className="caption live-foot">{qty(data.coverage.missing.length)} of {qty(data.coverage.symbols)} symbols in “{data.coverage.watchlist.name}” aren’t traded live.</p>
+      )}
+      {shownTab === 'review' && oneDay && afterClose && (
+        <div className="live-foot">
+          <button className="link-btn accent" disabled={rechecking} onClick={recheck}>{rechecking ? 'Checking…' : 'Re-check day against the backtest'}</button>
+        </div>
+      )}
+    </>
+  );
 
   return (
-    <div className="stack">
-      <div className="row page-head" style={{ alignItems: 'flex-end' }}>
+    <div className="stack live-page">
+      <div className="row page-head" style={{ alignItems: 'flex-start' }}>
         <div className="spacer">
-          <h1 className="display">Live paper</h1>
-          <p className="page-sub">
-            {status.watchlist ? `Trading “${status.watchlist}” · ` : ''}
-            {sessionLabel(status)} · no orders are placed
-          </p>
+          <div className="row live-title">
+            <h1 className="display">Live paper</h1>
+            <span className={`live-pill live-pill-${head.tone}`}><i />{head.pill}</span>
+          </div>
+          <p className="page-sub">{head.line}</p>
         </div>
         <button className="btn" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
       </div>
 
       <div className="research-row">
-        <Segmented label="Range" value={range} options={RANGES} onChange={setRange} />
-        <label className="affix">From
-          <input className="input input-date" type="date" value={from} max={to} onChange={(e) => pickDate('from', e.target.value)} />
-        </label>
-        <label className="affix">To
-          <input className="input input-date" type="date" value={to} min={from} max={today} onChange={(e) => pickDate('to', e.target.value)} />
-        </label>
+        <Segmented label="Range" value={range} options={RANGES} onChange={(r) => { setRange(r); if (r === 'custom') setCustom({ from, to }); }} />
+        {range === 'custom' ? (
+          <>
+            <label className="affix">From
+              <input className="input input-date" type="date" value={custom.from} max={custom.to}
+                onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })} />
+            </label>
+            <label className="affix">To
+              <input className="input input-date" type="date" value={custom.to} min={custom.from} max={today}
+                onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} />
+            </label>
+          </>
+        ) : (
+          <label className="affix">Date
+            <input className="input input-date" type="date" value={date} max={today}
+              onChange={(e) => { if (e.target.value) { setDate(e.target.value); setPicked(true); } }} />
+          </label>
+        )}
         <label className="affix">List
           <select className="input" value={listId ?? ''} onChange={(e) => { setListId(Number(e.target.value)); setSelected(null); }}>
             {lists.map((w) => <option key={w.id} value={w.id}>{w.name} · {qty(w.count)}</option>)}
@@ -283,35 +280,20 @@ export default function Live() {
 
       <Notice notice={liveNotice(status)} />
       {error && <div className="banner banner-error">{error}</div>}
-      <Coverage coverage={data.coverage} />
 
-      <div className="stat-grid stat-grid-fit">
-        <Stat label="Net P&L" value={pnl(summary.netPnl)} className={tone(summary.netPnl)} sub={`${span}, closed trades`} />
+      <div className="stat-grid stat-grid-fit live-stats">
+        <Stat label="Net P&L" value={pnl(summary.netPnl)} className={tone(summary.netPnl)} sub={span} />
         <Stat label="Trades" value={qty(summary.trades)} sub={`${qty(summary.open)} open`} />
         <Stat label="Win rate" value={summary.winRate === null ? '—' : rate(summary.winRate)} sub={`${qty(summary.wins)} W · ${qty(summary.losses)} L`} />
-        <Stat label="Days traded" value={qty(rows.length)} sub={oneDay ? '' : `${dateShort(from)} – ${dateShort(to)}`} />
+        <Stat label="Days traded" value={qty(days.length)} sub={oneDay ? 'single day' : span} />
+        <CheckStat counts={counts} checkedDays={data.reconciliations.length} onShow={() => { setTab('review'); setSelected(null); }} />
       </div>
 
-      {pick && <TradeDay key={keyOf(pick)} trade={pick} onClose={() => setSelected(null)} />}
-
-      <section className="stack">
-        <h2 className="title-lg">{oneDay ? `Trades · ${dateLong(from)}` : 'Trades'}</h2>
-        {!oneDay && rows.length > 1 && (
-          <div className="card">
-            <PnlBars rows={rows} label={(r) => dateShort(r.key)} />
-          </div>
-        )}
-        {data.trades.length ? (
-          <TradesTable trades={data.trades} selected={selected} onSelect={select} showDate={!oneDay} />
-        ) : (
-          <p className="caption">
-            No paper trades {oneDay ? `on ${dateLong(from)}` : `from ${dateShort(from)} to ${dateShort(to)}`}
-            {from === today ? '. Refresh to see new breakouts.' : '.'}
-          </p>
-        )}
-      </section>
-
-      <Reconciliations items={data.reconciliations} onRecheck={recheck} busy={rechecking} />
+      <div className="live-split">
+        <LiveList rows={visibleRows} tabs={tabs} tab={shownTab} onTab={(v) => { setTab(v); setSelected(null); }}
+          sortBy={sortBy} onSort={setSortBy} selected={narrow ? null : current?.key} onSelect={select} footer={footer} />
+        {!narrow && (panel || <div className="card live-trade live-trade-empty"><p className="caption">No trades {oneDay ? `on ${dateLong(from)}` : 'in this range'}. {from === today ? 'Refresh to see new breakouts.' : ''}</p></div>)}
+      </div>
     </div>
   );
 }
