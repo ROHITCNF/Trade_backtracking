@@ -1,5 +1,6 @@
-// Live paper trading: what the Live page says about the scheduler, and the
-// per-day rows for its P&L chart. Pure, so the rules are tested in web/test.
+// Live paper trading: what the Live page says about the scheduler, the range
+// it shows, and the per-day rows for its P&L chart. Pure, so the rules are
+// tested in web/test.
 
 import { istParts } from './ist.js';
 import { addDays, addMonths } from './dates.js';
@@ -8,6 +9,9 @@ import { addDays, addMonths } from './dates.js';
 // minutes after the 15:14 exit; 15:30 matches the market pill.
 const START = 9 * 60 + 10;
 const CLOSE = 15 * 60 + 30;
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const IST_MS = 5.5 * 3600 * 1000;
 
 export function inLiveWindow(now = Date.now()) {
   const { weekday, minutes } = istParts(now);
@@ -31,16 +35,33 @@ export function liveNotice(status, now = Date.now()) {
   return null;
 }
 
-// One line for the status strip.
-export function sessionLabel(status, now = Date.now()) {
-  if (!status?.enabled) return 'Off';
-  const s = status.session;
-  if (s?.running) return `Watching ${s.symbols} symbols · ${s.open} open · ${s.closed} closed today`;
-  if (inLiveWindow(now)) return status.tokenConnected ? 'Starting…' : 'Waiting for Fyers';
-  return 'Idle · next session 09:10 IST on a weekday';
+// 'Mon 2 Nov, 09:10 IST': the next time the scheduler starts a session.
+// Weekdays only; NSE holidays are not known (#69).
+export function nextSession(now = Date.now()) {
+  const { weekday, minutes } = istParts(now);
+  let ahead = weekday >= 1 && weekday <= 5 && minutes < START ? 0 : 1;
+  while ([0, 6].includes((weekday + ahead) % 7)) ahead++;
+  const d = new Date(now + IST_MS + ahead * 86400000);
+  return `${DAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, 09:10 IST`;
 }
 
-// Closed trades grouped by date, oldest first, in the shape PnlBars draws.
+// The pill next to the title and the line under it.
+export function sessionHeader(status, now = Date.now()) {
+  const tail = 'paper trading, no real orders';
+  if (!status?.enabled) return { pill: 'Off', tone: 'off', line: `Live paper trading is switched off · ${tail}` };
+  const s = status.session;
+  if (s?.running) {
+    return { pill: 'Live', tone: 'live', line: `Watching ${s.symbols} symbols of “${status.watchlist}” · ${s.open} open · ${s.closed} closed today · ${tail}` };
+  }
+  if (inLiveWindow(now)) {
+    return status.tokenConnected
+      ? { pill: 'Starting', tone: 'idle', line: `Starting today’s session · ${tail}` }
+      : { pill: 'Waiting', tone: 'warn', line: `Waiting for Fyers to start today’s session · ${tail}` };
+  }
+  return { pill: 'Idle', tone: 'idle', line: `Next session ${nextSession(now)} · ${tail}` };
+}
+
+// Closed trades grouped by date, oldest first.
 export function dailyRows(trades) {
   const byDate = new Map();
   for (const t of trades) {
@@ -56,29 +77,17 @@ export function dailyRows(trades) {
     .map(({ wins, ...d }) => ({ ...d, pnl: Math.round(d.pnl * 100) / 100, winRate: Math.round((wins / d.trades) * 100) }));
 }
 
-// One reconciliation (live vs backtest, after the close) as a short verdict.
-export function reconLabel(r) {
-  const parts = [];
-  if (r.mismatches.length) parts.push(`${r.mismatches.length} mismatch${r.mismatches.length === 1 ? '' : 'es'}`);
-  else if (r.backfilled === 0 || r.matched > 0) parts.push(`${r.matched}/${r.checked} matched`);
-  if (r.backfilled) parts.push(`${r.backfilled} backfilled`);
-  return { text: parts.join(' · '), tone: r.mismatches.length ? 'loss' : 'profit' };
-}
-
-// The Live page's range buttons. 'day' is one day: the last trading day
-// (the newest day with a paper trade, from /api/live/status) or today when
-// there is none yet. The others end today. 'custom' takes the picked dates.
+// The range buttons. All but 'custom' end on the chosen Date, which defaults
+// to the last trading day (the newest day with a paper trade, from
+// /api/live/status). 'custom' takes From and To.
 export const RANGES = [['day', 'Day'], ['15d', '15D'], ['1m', '1M'], ['1y', '1Y'], ['custom', 'Custom']];
 
-export function liveRange(range, { today, lastTradeDate, custom }) {
+export function liveRange(range, { date, custom }) {
   switch (range) {
-    case 'day': {
-      const d = lastTradeDate || today;
-      return { from: d, to: d };
-    }
-    case '15d': return { from: addDays(today, -14), to: today };
-    case '1m': return { from: addDays(addMonths(today, -1), 1), to: today };
-    case '1y': return { from: addDays(addMonths(today, -12), 1), to: today };
+    case 'day': return { from: date, to: date };
+    case '15d': return { from: addDays(date, -14), to: date };
+    case '1m': return { from: addDays(addMonths(date, -1), 1), to: date };
+    case '1y': return { from: addDays(addMonths(date, -12), 1), to: date };
     default: return { from: custom.from, to: custom.to };
   }
 }

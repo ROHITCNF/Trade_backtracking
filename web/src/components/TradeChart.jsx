@@ -11,10 +11,11 @@ import { price } from '../lib/format.js';
 const IST = 19800;
 
 // Fills the opening range: a rectangle from the first candle to the last
-// candle before orbEnd, between the range's low and high.
+// candle before orbEnd, between the range's low and high. With `full`, the
+// band spans the whole chart width, so the range stays visible when zoomed.
 class RangeBand {
-  constructor(from, to, low, high, color) {
-    Object.assign(this, { from, to, low, high, color });
+  constructor(from, to, low, high, color, full = false) {
+    Object.assign(this, { from, to, low, high, color, full });
   }
   attached({ chart, series, requestUpdate }) {
     Object.assign(this, { chart, series });
@@ -28,8 +29,8 @@ class RangeBand {
           draw: (target) =>
             target.useBitmapCoordinateSpace(({ context, horizontalPixelRatio: hr, verticalPixelRatio: vr }) => {
               const ts = this.chart.timeScale();
-              const x1 = ts.timeToCoordinate(this.from);
-              const x2 = ts.timeToCoordinate(this.to);
+              const x1 = this.full ? 0 : ts.timeToCoordinate(this.from);
+              const x2 = this.full ? ts.width() : ts.timeToCoordinate(this.to);
               const y1 = this.series.priceToCoordinate(this.high);
               const y2 = this.series.priceToCoordinate(this.low);
               if ([x1, x2, y1, y2].some((v) => v === null)) return;
@@ -42,7 +43,67 @@ class RangeBand {
   }
 }
 
-export default function TradeChart({ candles, trade, orbEnd, height = 360 }) {
+// Shapes the built-in markers can't draw: a ring (entry), a dashed ring (the
+// backtest's entry when it differs), a square (exit) and diamonds (best and
+// worst move). Each mark is { time (epoch s, IST-shifted), price, shape, color }.
+class Marks {
+  constructor(marks, fill) {
+    Object.assign(this, { marks, fill });
+  }
+  attached({ chart, series, requestUpdate }) {
+    Object.assign(this, { chart, series });
+    requestUpdate();
+  }
+  paneViews() {
+    return [
+      {
+        zOrder: () => 'top',
+        renderer: () => ({
+          draw: (target) =>
+            target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio: hr, verticalPixelRatio: vr }) => {
+              const ts = this.chart.timeScale();
+              for (const m of this.marks) {
+                const x = ts.timeToCoordinate(m.time);
+                const y = this.series.priceToCoordinate(m.price);
+                if (x === null || y === null) continue;
+                const cx = x * hr;
+                const cy = y * vr;
+                const r = 6 * hr;
+                ctx.save();
+                ctx.lineWidth = 2 * hr;
+                ctx.strokeStyle = m.color;
+                ctx.fillStyle = m.color;
+                ctx.beginPath();
+                if (m.shape === 'ring' || m.shape === 'dashed-ring') {
+                  if (m.shape === 'dashed-ring') ctx.setLineDash([3 * hr, 3 * hr]);
+                  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                  ctx.fillStyle = this.fill;
+                  ctx.fill();
+                  ctx.stroke();
+                } else if (m.shape === 'square') {
+                  ctx.rect(cx - r * 0.8, cy - r * 0.8, r * 1.6, r * 1.6);
+                  ctx.fill();
+                } else {
+                  ctx.moveTo(cx, cy - r);
+                  ctx.lineTo(cx + r, cy);
+                  ctx.lineTo(cx, cy + r);
+                  ctx.lineTo(cx - r, cy);
+                  ctx.closePath();
+                  ctx.fill();
+                }
+                ctx.restore();
+              }
+            }),
+        }),
+      },
+    ];
+  }
+}
+
+// `marks` replaces the default entry/exit markers (Live page); `visible`
+// zooms to { from, to } epoch seconds; `bandFull` stretches the range band
+// across the chart; `lineTitles` labels the price lines.
+export default function TradeChart({ candles, trade, orbEnd, height = 360, marks = null, visible = null, bandFull = false, lineTitles = true }) {
   const ref = useRef(null);
   const c = useThemeColors();
 
@@ -59,6 +120,8 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360 }) {
     });
     const series = chart.addSeries(CandlestickSeries, {
       upColor: c.profit, downColor: c.loss, wickUpColor: c.profit, wickDownColor: c.loss, borderVisible: false,
+      // With custom marks (Live), the last price would read as a fourth level.
+      lastValueVisible: !marks, priceLineVisible: !marks,
       // Price lines don't widen the scale on their own; keep stop and target in view.
       autoscaleInfoProvider: (original) => {
         const res = original();
@@ -76,7 +139,7 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360 }) {
     const data = candles.map(([t, o, h, l, cl]) => ({ time: t + IST, open: o, high: h, low: l, close: cl }));
     series.setData(data);
 
-    const line = (p, color, title) => p !== null && series.createPriceLine({ price: p, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title });
+    const line = (p, color, title) => p !== null && series.createPriceLine({ price: p, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: lineTitles ? title : '' });
     line(trade.entry, c.accent, 'Entry');
     line(trade.sl, c.loss, 'SL');
     line(trade.target, c.profit, 'Target');
@@ -88,16 +151,22 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360 }) {
       const dt = new Date(d.time * 1000);
       return dt.getUTCHours() * 60 + dt.getUTCMinutes() < orbEndMinute;
     });
-    if (inRange.length && trade.orbHigh != null) series.attachPrimitive(new RangeBand(inRange[0].time, inRange.at(-1).time, trade.orbLow, trade.orbHigh, `${c.accent}1F`));
+    if (inRange.length && trade.orbHigh != null) series.attachPrimitive(new RangeBand(inRange[0].time, inRange.at(-1).time, trade.orbLow, trade.orbHigh, `${c.accent}1F`, bandFull));
 
-    // A live paper trade still open has no exit yet.
-    createSeriesMarkers(series, [
-      { time: trade.entryTs + IST, position: 'atPriceMiddle', shape: 'circle', color: c.accent, price: trade.entry, text: '' },
-      trade.exitTs != null && { time: trade.exitTs + IST, position: 'atPriceMiddle', shape: 'square', color: c.ink, price: trade.exit, text: '' },
-    ].filter(Boolean));
-    chart.timeScale().fitContent();
+    if (marks) {
+      const color = { accent: c.accent, ink: c.ink, profit: c.profit, loss: c.loss, muted: c.muted };
+      series.attachPrimitive(new Marks(marks.map((m) => ({ ...m, time: m.time + IST, color: color[m.color] || m.color })), c.surface));
+    } else {
+      // A live paper trade still open has no exit yet.
+      createSeriesMarkers(series, [
+        { time: trade.entryTs + IST, position: 'atPriceMiddle', shape: 'circle', color: c.accent, price: trade.entry, text: '' },
+        trade.exitTs != null && { time: trade.exitTs + IST, position: 'atPriceMiddle', shape: 'square', color: c.ink, price: trade.exit, text: '' },
+      ].filter(Boolean));
+    }
+    if (visible) chart.timeScale().setVisibleRange({ from: visible.from + IST, to: visible.to + IST });
+    else chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [candles, trade, orbEnd, height, c]);
+  }, [candles, trade, orbEnd, height, c, marks, visible, bandFull, lineTitles]);
 
   return <div ref={ref} style={{ width: '100%', height }} />;
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inLiveWindow, liveNotice, sessionLabel, dailyRows } from '../src/lib/live.js';
+import { inLiveWindow, liveNotice, sessionHeader, nextSession, dailyRows } from '../src/lib/live.js';
 
 const ist = (s) => Date.parse(`${s}+05:30`);
 const MON_OPEN = ist('2026-10-26T10:00:00'); // Monday
@@ -35,12 +35,22 @@ test('notice: off, then missing token in the window, then a failed start', () =>
   assert.equal(liveNotice(running, MON_OPEN), null);
 });
 
-test('session label follows the scheduler and the clock', () => {
-  assert.equal(sessionLabel(status({ enabled: false }), MON_OPEN), 'Off');
-  assert.equal(sessionLabel(status({ session: { running: true, symbols: 39, open: 2, closed: 1 } }), MON_OPEN), 'Watching 39 symbols · 2 open · 1 closed today');
-  assert.equal(sessionLabel(status(), MON_OPEN), 'Starting…');
-  assert.equal(sessionLabel(status({ tokenConnected: false }), MON_OPEN), 'Waiting for Fyers');
-  assert.match(sessionLabel(status(), SAT), /^Idle/);
+test('session header follows the scheduler and the clock', () => {
+  assert.equal(sessionHeader(status({ enabled: false }), MON_OPEN).pill, 'Off');
+  const live = sessionHeader(status({ session: { running: true, symbols: 95, open: 2, closed: 1 } }), MON_OPEN);
+  assert.equal(live.pill, 'Live');
+  assert.match(live.line, /^Watching 95 symbols of “core” · 2 open · 1 closed today/);
+  assert.equal(sessionHeader(status(), MON_OPEN).pill, 'Starting');
+  assert.equal(sessionHeader(status({ tokenConnected: false }), MON_OPEN).pill, 'Waiting');
+  const idle = sessionHeader(status(), SAT);
+  assert.equal(idle.pill, 'Idle');
+  assert.equal(idle.line, 'Next session Mon 26 Oct, 09:10 IST · paper trading, no real orders');
+});
+
+test('next session: today before 09:10 on a weekday, else the next weekday', () => {
+  assert.equal(nextSession(MON_EARLY), 'Mon 26 Oct, 09:10 IST');
+  assert.equal(nextSession(MON_OPEN), 'Tue 27 Oct, 09:10 IST');
+  assert.equal(nextSession(ist('2026-10-30T16:00:00')), 'Mon 2 Nov, 09:10 IST');
 });
 
 test('daily rows sum closed trades per date, oldest first', () => {
@@ -57,18 +67,11 @@ test('daily rows sum closed trades per date, oldest first', () => {
   assert.deepEqual(dailyRows([]), []);
 });
 
-test('reconciliation verdicts', async () => {
-  const { reconLabel } = await import('../src/lib/live.js');
-  assert.deepEqual(reconLabel({ checked: 39, matched: 39, backfilled: 0, mismatches: [] }), { text: '39/39 matched', tone: 'profit' });
-  assert.deepEqual(reconLabel({ checked: 39, matched: 37, backfilled: 0, mismatches: [{}, {}] }), { text: '2 mismatches', tone: 'loss' });
-  assert.deepEqual(reconLabel({ checked: 39, matched: 0, backfilled: 4, mismatches: [] }), { text: '4 backfilled', tone: 'profit' });
-});
 
-test('range buttons: Day is the last trading day, the rest end today', async () => {
+test('range buttons end on the chosen date; custom takes From and To', async () => {
   const { liveRange } = await import('../src/lib/live.js');
-  const ctx = { today: '2026-11-02', lastTradeDate: '2026-10-30', custom: { from: '2026-10-01', to: '2026-10-05' } };
-  assert.deepEqual(liveRange('day', ctx), { from: '2026-10-30', to: '2026-10-30' });
-  assert.deepEqual(liveRange('day', { ...ctx, lastTradeDate: null }), { from: '2026-11-02', to: '2026-11-02' });
+  const ctx = { date: '2026-11-02', custom: { from: '2026-10-01', to: '2026-10-05' } };
+  assert.deepEqual(liveRange('day', ctx), { from: '2026-11-02', to: '2026-11-02' });
   assert.deepEqual(liveRange('15d', ctx), { from: '2026-10-19', to: '2026-11-02' });
   assert.deepEqual(liveRange('1m', ctx), { from: '2026-10-03', to: '2026-11-02' });
   assert.deepEqual(liveRange('1y', ctx), { from: '2025-11-03', to: '2026-11-02' });
