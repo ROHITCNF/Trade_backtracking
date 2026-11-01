@@ -10,18 +10,46 @@ const { toMinutes, istParts, istToday } = require('../src/time');
 const { CandleBuilder } = require('./candles');
 const { createPaperBroker } = require('./broker/paper');
 
-// The engine returns a finished trade or nothing; it has no idea a day is still
-// running. Combining its exit reason with the clock tells us what is actually
-// held right now. This table is the whole live/backtest translation layer.
-function desiredState(trade, lastMinute, sessionEndMin) {
-  if (!trade) return { position: 'FLAT' };
-  if (trade.reason !== 'EOD') return { position: 'CLOSED', trade };
-  if (lastMinute !== null && lastMinute < sessionEndMin) return { position: 'OPEN', trade };
-  return { position: 'CLOSED', trade };
+const { round } = require('../src/util');
+
+// The engine decides the entry. From then on the position is managed here, on
+// the prices the socket actually delivers (D24): the first tick at or through
+// the stop or target closes it at that tick's price, and the first tick at
+// sessionEnd closes it as EOD. The backtest can't see the order of prices
+// inside a minute; live can, so live never re-asks the engine once it holds.
+//
+// While live is blind (before launch, during a disconnect, after a restart),
+// no tick exists, so the REST candles for those minutes are checked the way the
+// backtest checks them: stop wins a candle that touches both, fills at the level.
+
+const hhmm = (minute) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+
+function pnlOf(position, exit, config) {
+  const sign = position.side === 'long' ? 1 : -1;
+  const gross = (exit - position.entry) * sign * position.quantity;
+  const cost = ((position.entry + exit) * position.quantity * (config.costBps || 0)) / 10000;
+  return round(gross - cost);
 }
 
-const entryOf = (t) => ({ side: t.side, price: t.entry, quantity: t.quantity, sl: t.sl, target: t.target, time: t.entryTime });
-const exitOf = (t) => ({ side: t.side, price: t.exit, quantity: t.quantity, reason: t.reason, pnl: t.pnl, time: t.exitTime });
+// The exit a single tick triggers for an open position, or null.
+function tickExit(position, price, minute, sessionEndMin) {
+  const long = position.side === 'long';
+  if (long ? price <= position.sl : price >= position.sl) return 'SL';
+  if (position.target != null && (long ? price >= position.target : price <= position.target)) return 'TARGET';
+  if (minute >= sessionEndMin) return 'EOD';
+  return null;
+}
+
+// The exit a REST candle implies for a position live couldn't watch: the
+// engine's rule (stop first on a candle touching both, fill at the level),
+// then EOD at the close of the sessionEnd candle.
+function candleExit(position, [, , h, l, c], minute, sessionEndMin) {
+  const long = position.side === 'long';
+  if (long ? l <= position.sl : h >= position.sl) return { reason: 'SL', price: position.sl };
+  if (position.target != null && (long ? h >= position.target : l <= position.target)) return { reason: 'TARGET', price: position.target };
+  if (minute >= sessionEndMin) return { reason: 'EOD', price: c };
+  return null;
+}
 
 // store: { load(date), save(state), logDecision(date, event) }, each may return a promise.
 // Every broker event is written to store.logDecision and handed to onDecision.
@@ -41,6 +69,8 @@ function createLiveSession({
   const orbStartMin = toMinutes(config.orbStart);
   const books = new Map(symbols.map((s) => [s, new CandleBuilder()]));
   const status = new Map(symbols.map((s) => [s, 'FLAT']));
+  const positions = new Map(); // symbol -> { side, entry, sl, target, quantity, entryTime } while OPEN
+  const seen = new Map(); // symbol -> epoch s of the last tick acted on: live watched up to here
   let saved = { date, symbols: {} };
   let socket = null;
   let connects = 0;
@@ -65,36 +95,77 @@ function createLiveSession({
 
   const backfill = () => warmStart(symbols, (symbol, candles) => books.get(symbol).setCompleted(candles));
 
-  function evaluate(symbol) {
+  // Persists a status change at once. A restart must never re-emit a position
+  // it already took. The in-memory status changes first, synchronously, so a
+  // tick arriving before the write lands cannot emit it twice either.
+  function setStatus(symbol, next) {
+    status.set(symbol, next);
+    const p = positions.get(symbol);
+    saved.symbols[symbol] = next === 'OPEN' && p ? { position: next, ...p } : { position: next };
+    const snapshot = { date, symbols: { ...saved.symbols } };
+    enqueue(() => store.save(snapshot));
+  }
+
+  function enter(symbol, position) {
+    positions.set(symbol, position);
+    broker.enter(symbol, { ...position, price: position.entry, time: position.entryTime });
+    setStatus(symbol, 'OPEN');
+  }
+
+  function exit(symbol, price, reason, minute) {
+    const p = positions.get(symbol);
+    broker.exit(symbol, { side: p.side, price: round(price), quantity: p.quantity, reason, pnl: pnlOf(p, price, config), time: hhmm(minute) });
+    positions.delete(symbol);
+    setStatus(symbol, 'CLOSED');
+  }
+
+  // Blind minutes: check the REST candles from the last minute live watched
+  // (or the entry minute) onwards. The forming candle is the socket's, so skip it.
+  function scanCandles(symbol) {
+    const p = positions.get(symbol);
+    if (!p) return;
     const book = books.get(symbol);
-    const candles = book.candles();
+    const from = Math.max(toMinutes(p.entryTime), seen.has(symbol) ? istParts(seen.get(symbol)).minute : 0);
+    for (const c of book.completed) {
+      const minute = istParts(c[0]).minute;
+      if (minute < from) continue;
+      const hit = candleExit(p, c, minute, sessionEndMin);
+      if (hit) return exit(symbol, hit.price, hit.reason, minute);
+    }
+  }
+
+  // FLAT: ask the engine whether a breakout has happened. A breakout on the
+  // tick being handled fills at that tick's price; one found only in candles
+  // (live was blind when it happened) fills where the backtest would, and its
+  // blind minutes are then checked for an exit.
+  function evaluate(symbol, tick = null) {
+    const state = status.get(symbol);
+    if (state === 'CLOSED') return;
+    if (state === 'OPEN') {
+      if (!positions.has(symbol)) adoptEngineTrade(symbol);
+      return scanCandles(symbol);
+    }
+    const candles = books.get(symbol).candles();
     if (candles.length === 0) return;
-
     const trade = runBacktest(candles, { ...config, symbol })[0];
-    const want = desiredState(trade, book.lastMinute(), sessionEndMin);
-    const have = status.get(symbol);
-
-    let next = have;
-    if (want.position === 'OPEN' && have === 'FLAT') {
-      broker.enter(symbol, entryOf(want.trade));
-      next = 'OPEN';
-    } else if (want.position === 'CLOSED' && have !== 'CLOSED') {
-      // From FLAT, entry and exit landed inside the same evaluation — record both
-      // so the day's log still reconciles against the backtest.
-      if (have === 'FLAT') broker.enter(symbol, entryOf(want.trade));
-      broker.exit(symbol, exitOf(want.trade));
-      next = 'CLOSED';
+    if (!trade) return;
+    const position = { side: trade.side, entry: trade.entry, sl: trade.sl, target: trade.target, quantity: trade.quantity, entryTime: trade.entryTime };
+    const onThisTick = tick && toMinutes(trade.entryTime) === tick.minute;
+    if (onThisTick) {
+      enter(symbol, { ...position, entry: round(tick.price), entryTime: hhmm(tick.minute) });
+      const why = tickExit(positions.get(symbol), tick.price, tick.minute, sessionEndMin);
+      if (why === 'EOD') exit(symbol, tick.price, why, tick.minute);
+      return;
     }
+    enter(symbol, position);
+    scanCandles(symbol);
+  }
 
-    // Persist immediately on a change. A restart must never re-emit a position
-    // it already took. The in-memory status changes first, synchronously, so a
-    // tick arriving before the write lands cannot emit it twice either.
-    if (next !== have) {
-      status.set(symbol, next);
-      saved.symbols[symbol] = { position: next };
-      const snapshot = { date, symbols: { ...saved.symbols } };
-      enqueue(() => store.save(snapshot));
-    }
+  // A position restored from a store that kept only "OPEN" (written before
+  // D24): rebuild its levels from the engine, as the old runner had them.
+  function adoptEngineTrade(symbol) {
+    const trade = runBacktest(books.get(symbol).candles(), { ...config, symbol })[0];
+    if (trade) positions.set(symbol, { side: trade.side, entry: trade.entry, sl: trade.sl, target: trade.target, quantity: trade.quantity, entryTime: trade.entryTime });
   }
 
   function onTick(symbol, ltp, ts) {
@@ -105,9 +176,19 @@ function createLiveSession({
     const { minute, date: tickDate } = istParts(ts);
     if (tickDate !== date || minute < orbStartMin || minute > sessionEndMin) return;
     lastTickAt = ts;
-    // Only re-evaluate when the forming candle's range actually moved; a tick
-    // that cannot change the outcome must not trigger a decision.
-    if (book.addTick(ltp, ts)) evaluate(symbol);
+    const moved = book.addTick(ltp, ts);
+    const state = status.get(symbol);
+    if (state === 'OPEN' && positions.has(symbol)) {
+      // Holding: every tick is checked against this position's own levels.
+      seen.set(symbol, ts);
+      const why = tickExit(positions.get(symbol), ltp, minute, sessionEndMin);
+      if (why) exit(symbol, ltp, why, minute);
+      return;
+    }
+    if (state === 'FLAT') seen.set(symbol, ts);
+    // Flat: only a tick that moved the forming candle's high or low can be a
+    // breakout, so only those ask the engine.
+    if (moved) evaluate(symbol, { price: ltp, minute });
   }
 
   const counts = () => {
@@ -128,7 +209,14 @@ function createLiveSession({
 
     saved = (await store.load(date)) || { date, symbols: {} };
     saved.symbols = saved.symbols || {};
-    for (const s of symbols) status.set(s, saved.symbols[s]?.position || 'FLAT');
+    for (const s of symbols) {
+      const kept = saved.symbols[s] || {};
+      status.set(s, kept.position || 'FLAT');
+      if (kept.position === 'OPEN' && kept.side) {
+        const { side, entry, sl, target, quantity, entryTime } = kept;
+        positions.set(s, { side, entry: Number(entry), sl: Number(sl), target: target == null ? null : Number(target), quantity: Number(quantity), entryTime });
+      }
+    }
 
     log("Warm start: pulling today's candles...");
     await backfill();
@@ -185,4 +273,4 @@ function createLiveSession({
   return { start, stop, refresh, status: getStatus, onTick };
 }
 
-module.exports = { createLiveSession, desiredState };
+module.exports = { createLiveSession, tickExit, candleExit };

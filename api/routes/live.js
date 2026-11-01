@@ -57,10 +57,12 @@ const daysBefore = (date, n) => istParts(dateToEpoch(date) - n * 86400).date;
 // symbol either matched or is a mismatch, so it follows from the two.
 function reconForList(r, { listed, live, backfilledOn }) {
   const mismatches = r.mismatches.filter((m) => listed.has(m.symbol));
+  const notes = (r.notes || []).filter((n) => listed.has(n.symbol));
   const checked = [...listed].filter((s) => live.has(s)).length;
   const backfilled = backfilledOn.get(r.date) || 0;
-  const matched = r.matched > 0 ? Math.max(0, checked - mismatches.length) : 0;
-  return { ...r, checked, matched, backfilled, mismatches };
+  const expected = notes.filter((n) => n.kind === 'tick').length;
+  const matched = r.matched > 0 ? Math.max(0, checked - mismatches.length - expected) : 0;
+  return { ...r, checked, matched, backfilled, mismatches, notes };
 }
 
 // What the trade chart needs beyond the stored row: the opening range from the
@@ -129,7 +131,7 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
       );
       const trades = rows.map(rowToTrade);
       const rec = await db.query(
-        `select date::text as date, reconciled_at as "reconciledAt", checked, matched, backfilled, mismatches
+        `select date::text as date, reconciled_at as "reconciledAt", checked, matched, backfilled, mismatches, notes
          from paper_reconciliations where date between $1 and $2 order by date desc`,
         [from, to]
       );

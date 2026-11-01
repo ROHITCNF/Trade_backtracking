@@ -7,9 +7,15 @@ placement needs app whitelisting and comes later.
 ## The one rule
 
 **`src/engine.js` is the only place strategy logic lives.** The live runner does not
-re-implement the opening range, the breakout test, the stop or the target. If live and
-backtest ever disagree about what a trade should be, that is a bug in the plumbing here,
-never a second opinion about the strategy.
+re-implement the opening range, the breakout test, the stop or the target: the engine
+decides the entry and sets the levels.
+
+**One exception, by design (D24): once a position is open, live manages it on the
+socket's prices.** The first tick at or through the stop or target closes it at that
+tick's price; the first tick at `sessionEnd` closes it as EOD. Entries fill at the
+breakout tick's price too. A 1-minute backtest can't see the order of prices inside a
+candle and assumes the worst; live can see it, so it never re-asks the engine while it
+holds (which would also let a whipsaw candle swap a stopped-out long for a short).
 
 ## How a tick becomes a decision
 
@@ -20,13 +26,11 @@ websocket tick (LTP)
 candles.js ─ updates the minute candle being formed right now
    │          (and closes it when the IST minute rolls over)
    ▼
-[today's completed candles] + [the partial candle]
-   │
-   ▼
-runBacktest(candles, config)      ← the backtest engine, unmodified
-   │
-   ▼
-live.js reads the result as a desired state
+session.js, per symbol:
+   FLAT    → runBacktest([completed] + [partial])   ← the engine, unmodified
+             breakout on this tick? ENTRY at this tick's price, engine's stop/target
+   OPEN    → this tick vs the position's own stop / target / sessionEnd → EXIT at this price
+   CLOSED  → nothing (one trade a day)
    │
    ▼
 broker/paper.js records it        (broker/fyers.js will place it, later)
@@ -34,22 +38,18 @@ broker/paper.js records it        (broker/fyers.js will place it, later)
 
 The partial candle's high and low update on every tick, so the engine sees a breakout
 the moment price crosses the opening range — not a minute later when the candle closes.
-That keeps live entries close to the backtest's fill assumption, and it means there is
-exactly one code path.
+Only ticks that move the partial candle's high or low can be a breakout, so only those
+ask the engine; while a position is open, every tick is checked.
 
-## Reading the engine's output as a live position
+## While live is blind
 
-`runBacktest` returns a finished trade or nothing. It has no concept of "still open", so
-the runner derives that from the exit reason and the clock:
-
-| engine returns | last candle before `sessionEnd`? | live meaning |
-|---|---|---|
-| nothing | — | flat, no breakout yet |
-| trade, reason `SL` / `TARGET` | — | position closed, done for the day |
-| trade, reason `EOD` | yes | **position is open right now** at that entry |
-| trade, reason `EOD` | no | closed at the session end |
-
-That table is the whole translation layer. No engine changes were needed for it.
+Before launch, during a disconnect, or after a restart, no ticks exist for those
+minutes. On warm start, reconnect and the end-of-day refresh, an open position is
+checked against the REST candles from the last minute live watched (or its entry
+minute): the engine's rules apply there — stop wins a candle that touches both, fills
+at the level, EOD at the `sessionEnd` candle's close. A breakout found only in REST
+candles fills where the backtest would. A restart restores an open position's levels
+from `paper_trades` (or the state file), never from the engine.
 
 ## Files
 
@@ -126,9 +126,12 @@ disk on restart, so:
 An external pinger on `/api/health` keeps the instance awake through market hours
 (docs/deploy.md § Live paper trading). The scheduler is off unless `LIVE_ENABLED=true`.
 
-Reconciliation is "the one rule" made into a test that runs every day: paper fills come
-from the engine, so live and backtest must agree to the paisa. A mismatch is a plumbing
-bug here, never a second opinion about the strategy.
+Reconciliation runs every day after the close and labels each traded symbol:
+**match** (same side, entry minute, exit reason and exit minute; the P&L difference is
+kept as slippage), **tick order** (the backtest had to guess inside a candle that broke
+both range edges or touched both stop and target, and live saw the real order —
+expected), or **mismatch** (anything else: a missed breakout, a stop live never saw — a
+plumbing problem worth a look).
 
 ## What is deliberately not here
 
