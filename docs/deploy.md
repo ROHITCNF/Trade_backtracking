@@ -67,7 +67,7 @@ No orders are placed. The live session is hosted by the API itself
 | variable | value | effect |
 |---|---|---|
 | `LIVE_ENABLED` | `true` | turns the scheduler on; anything else leaves it off |
-| `LIVE_WATCHLIST` | `core` | name of the list (edited from the app's Journal) it trades |
+| `LIVE_WATCHLIST` | `live` | name of the list it trades; at most 100 symbols, the Fyers Standard websocket cap (decisions.md D22) |
 
 ### Keep the free instance awake
 

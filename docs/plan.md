@@ -102,6 +102,16 @@ The v2 design in `docs/design/reference/v2/`, frontend only ([decisions.md](deci
 | [#93](https://github.com/ROHITCNF/Trade_backtracking/issues/93) | Restyle the ticker page and Live for v2, mobile pass |
 | [#94](https://github.com/ROHITCNF/Trade_backtracking/issues/94) | Remove the v1 screens and the sweep UI |
 
+## M8 · Live paper by watchlist
+
+[decisions.md](decisions.md) D22.
+
+| issue | task |
+|---|---|
+| [#104](https://github.com/ROHITCNF/Trade_backtracking/issues/104) | Live session on a 95-symbol `live` list covering core and final |
+| [#105](https://github.com/ROHITCNF/Trade_backtracking/issues/105) | Filter paper trades by watchlist |
+| [#106](https://github.com/ROHITCNF/Trade_backtracking/issues/106) | Live page: range presets, date picker, watchlist dropdown |
+
 ## Owner involvement
 
 Only M5 needs the owner:

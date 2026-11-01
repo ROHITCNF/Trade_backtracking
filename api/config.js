@@ -24,7 +24,7 @@ function loadConfig(env = process.env) {
     // Live paper trading (api/live.js). Off unless explicitly enabled.
     live: {
       enabled: env.LIVE_ENABLED === 'true',
-      watchlist: env.LIVE_WATCHLIST || 'core',
+      watchlist: env.LIVE_WATCHLIST || 'live',
     },
   };
 }

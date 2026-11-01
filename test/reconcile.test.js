@@ -100,7 +100,7 @@ test('reconcile endpoint runs a past day and the list returns its result', { ski
   withDb(async (pool, store) => {
     const apiConfig = loadConfig({ DATABASE_URL: 'x', APP_PASSWORD_HASH: 'h', SESSION_SECRET: 'x'.repeat(32) });
     const headers = { authorization: `Bearer ${signSession(apiConfig.sessionSecret).token}` };
-    const { rows } = await pool.query(`insert into watchlists (name, source) values ('core', 'custom') returning id`);
+    const { rows } = await pool.query(`insert into watchlists (name, source) values ('live', 'custom') returning id`);
     await pool.query(`insert into watchlist_symbols (watchlist_id, symbol) values ($1, 'NSE:A-EQ'), ($1, 'NSE:B-EQ')`, [rows[0].id]);
     // The route reconciles with the real strategy config, so live must have used it too.
     await recordLive(store, runBacktest(DAYS['NSE:A-EQ'], { ...require('../config'), symbol: 'NSE:A-EQ' })[0]);

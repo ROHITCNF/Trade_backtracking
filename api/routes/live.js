@@ -120,7 +120,7 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
     async (request) => {
       const { date } = request.params;
       if (!afterClose(date)) throw httpError(409, 'The day isn’t over yet.');
-      const symbols = await loadWatchlist(db, app.live?.status().watchlist || 'core');
+      const symbols = await loadWatchlist(db, app.live?.status().watchlist || 'live');
       try {
         return await reconcileDay({ pool: db, date, symbols, config, getCandles });
       } catch (err) {
