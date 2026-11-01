@@ -1,22 +1,22 @@
-// Live paper trading (M6): the API's scheduler state, today's paper trades and
-// the history over a chosen window. Nothing here places orders; the session
-// runs inside the API (api/live.js) and this page only reads what it recorded.
-// Clicking a trade loads that day's candles from Fyers (one call, not stored).
+// Live paper trading (M6, D22): the API's scheduler state and the paper trades
+// it recorded, seen through one watchlist over a chosen range. Nothing here
+// places orders; the session runs inside the API (api/live.js) and this page
+// only reads what it recorded. It opens on the last trading day and never
+// moves on its own: Refresh picks up new trades. Clicking a trade loads that
+// day's candles from Fyers (one call, not stored).
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { connectFyers } from '../lib/me.jsx';
-import { addDays, istToday } from '../lib/dates.js';
+import { istToday } from '../lib/dates.js';
 import { dateLong, dateShort, pnl, price, qty, rate, tone } from '../lib/format.js';
-import { dailyRows, inLiveWindow, liveNotice, reconLabel, sessionLabel } from '../lib/live.js';
+import { RANGES, dailyRows, defaultWatchlist, liveNotice, liveRange, reconLabel, sessionLabel } from '../lib/live.js';
 import { PnlBars } from '../components/charts.jsx';
 import { Stat } from '../components/Stat.jsx';
 import TradeChart from '../components/TradeChart.jsx';
 import Segmented from '../components/Segmented.jsx';
 import Icon from '../components/Icon.jsx';
 
-const POLL_MS = 30000;
-const WINDOWS = [['7', '7 days'], ['30', '30 days'], ['90', '90 days']];
 const short = (s) => s.replace(/^NSE:|-EQ$/g, '');
 const keyOf = (t) => `${t.date}|${t.symbol}`;
 
@@ -152,62 +152,106 @@ function Reconciliations({ items, onRecheck, busy }) {
   );
 }
 
+// "8 of 95 symbols in core aren't traded live" — those never get a paper trade.
+function Coverage({ coverage }) {
+  if (!coverage?.missing.length) return null;
+  const { missing, symbols, watchlist } = coverage;
+  const shown = missing.slice(0, 8).map(short).join(', ');
+  return (
+    <p className="caption">
+      {qty(missing.length)} of {qty(symbols)} symbols in “{watchlist.name}” aren’t traded live, so they have no paper trades:{' '}
+      {shown}{missing.length > 8 ? `, +${missing.length - 8} more` : ''}.
+    </p>
+  );
+}
+
 export default function Live() {
   const [status, setStatus] = useState(null);
+  const [lists, setLists] = useState(null);
+  const [listId, setListId] = useState(null);
+  const [range, setRange] = useState('day');
+  const [custom, setCustom] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [days, setDays] = useState('30');
   const [selected, setSelected] = useState(null);
   const [rechecking, setRechecking] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [tick, setTick] = useState(0); // bumped by Refresh to re-read trades
+  const latest = useRef(0); // only the newest trades request may land
   const today = istToday();
 
-  const load = useCallback(async () => {
+  // Status (and with it the last trading day) is read on open and on Refresh
+  // only, so the page never jumps to a new day by itself.
+  const loadStatus = useCallback(async () => {
+    const [s, { watchlists }] = await Promise.all([api('/api/live/status'), api('/api/watchlists')]);
+    setStatus(s);
+    setLists(watchlists);
+    setListId((cur) => cur ?? defaultWatchlist(watchlists));
+    setCustom((cur) => cur ?? { from: s.lastTradeDate || s.today, to: s.lastTradeDate || s.today });
+  }, []);
+
+  const { from, to } = status && custom ? liveRange(range, { today, lastTradeDate: status.lastTradeDate, custom }) : {};
+
+  const loadTrades = useCallback(async () => {
+    if (!from || !to) return;
+    const id = ++latest.current;
+    const q = new URLSearchParams({ from, to, ...(listId && { watchlist: String(listId) }) });
     try {
-      const [s, d] = await Promise.all([
-        api('/api/live/status'),
-        api(`/api/paper-trades?from=${addDays(today, -(Number(days) - 1))}&to=${today}`),
-      ]);
-      setStatus(s);
+      const d = await api(`/api/paper-trades?${q}`);
+      if (id !== latest.current) return;
       setData(d);
       setError(null);
     } catch (err) {
+      if (id === latest.current) setError(err.message);
+    }
+  }, [from, to, listId, tick]);
+
+  useEffect(() => {
+    loadStatus().catch((err) => setError(err.message));
+  }, [loadStatus]);
+
+  useEffect(() => {
+    loadTrades();
+  }, [loadTrades]);
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      await loadStatus();
+      setTick((n) => n + 1);
+    } catch (err) {
       setError(err.message);
     }
-  }, [days, today]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // Poll only while a session can be producing trades.
-  const live = inLiveWindow();
-  useEffect(() => {
-    if (!live) return;
-    const t = setInterval(load, POLL_MS);
-    return () => clearInterval(t);
-  }, [live, load]);
+    setRefreshing(false);
+  }
 
   async function recheck(date) {
     setRechecking(date);
     try {
       await api(`/api/paper-trades/${date}/reconcile`, { method: 'POST' });
-      await load();
+      await loadTrades();
     } catch (err) {
       setError(err.message);
     }
     setRechecking(null);
   }
 
-  if (error && !data) return <div className="banner banner-error">{error}</div>;
-  if (!data || !status) return <p className="placeholder">Loading live paper trading…</p>;
+  // Editing a date makes the range custom, starting from what is shown.
+  function pickDate(key, value) {
+    if (!value) return;
+    setCustom({ from, to, [key]: value });
+    setRange('custom');
+  }
 
-  const todays = data.trades.filter((t) => t.date === today);
-  const history = data.trades.filter((t) => t.date !== today);
+  if (error && !data) return <div className="banner banner-error">{error}</div>;
+  if (!data || !status || !lists) return <p className="placeholder">Loading live paper trading…</p>;
+
+  const oneDay = from === to;
   const pick = data.trades.find((t) => keyOf(t) === selected);
   const select = (k) => setSelected((cur) => (cur === k ? null : k));
   const rows = dailyRows(data.trades);
-  const todayPnl = todays.filter((t) => t.status === 'closed').reduce((sum, t) => sum + t.pnl, 0);
   const { summary } = data;
+  const span = oneDay ? dateLong(from) : `${dateShort(from)} – ${dateShort(to)}`;
 
   return (
     <div className="stack">
@@ -215,45 +259,55 @@ export default function Live() {
         <div className="spacer">
           <h1 className="display">Live paper</h1>
           <p className="page-sub">
-            {status.watchlist ? `Watchlist “${status.watchlist}” · ` : ''}
+            {status.watchlist ? `Trading “${status.watchlist}” · ` : ''}
             {sessionLabel(status)} · no orders are placed
           </p>
         </div>
-        <Segmented label="History window" value={days} options={WINDOWS} onChange={setDays} />
+        <button className="btn" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
+      </div>
+
+      <div className="research-row">
+        <Segmented label="Range" value={range} options={RANGES} onChange={setRange} />
+        <label className="affix">From
+          <input className="input input-date" type="date" value={from} max={to} onChange={(e) => pickDate('from', e.target.value)} />
+        </label>
+        <label className="affix">To
+          <input className="input input-date" type="date" value={to} min={from} max={today} onChange={(e) => pickDate('to', e.target.value)} />
+        </label>
+        <label className="affix">List
+          <select className="input" value={listId ?? ''} onChange={(e) => { setListId(Number(e.target.value)); setSelected(null); }}>
+            {lists.map((w) => <option key={w.id} value={w.id}>{w.name} · {qty(w.count)}</option>)}
+          </select>
+        </label>
       </div>
 
       <Notice notice={liveNotice(status)} />
       {error && <div className="banner banner-error">{error}</div>}
+      <Coverage coverage={data.coverage} />
 
       <div className="stat-grid stat-grid-fit">
-        <Stat label="Net P&L" value={pnl(summary.netPnl)} className={tone(summary.netPnl)} sub={`${days} days, closed trades`} />
+        <Stat label="Net P&L" value={pnl(summary.netPnl)} className={tone(summary.netPnl)} sub={`${span}, closed trades`} />
         <Stat label="Trades" value={qty(summary.trades)} sub={`${qty(summary.open)} open`} />
         <Stat label="Win rate" value={summary.winRate === null ? '—' : rate(summary.winRate)} sub={`${qty(summary.wins)} W · ${qty(summary.losses)} L`} />
-        <Stat label="Today" value={pnl(todayPnl)} className={tone(todayPnl)} sub={`${qty(todays.length)} trades`} />
+        <Stat label="Days traded" value={qty(rows.length)} sub={oneDay ? '' : `${dateShort(from)} – ${dateShort(to)}`} />
       </div>
 
       {pick && <TradeDay key={keyOf(pick)} trade={pick} onClose={() => setSelected(null)} />}
 
       <section className="stack">
-        <h2 className="title-lg">Today · {dateShort(today)}</h2>
-        {todays.length ? (
-          <TradesTable trades={todays} selected={selected} onSelect={select} />
-        ) : (
-          <p className="caption">No paper trades yet today.{live ? ' Breakouts appear here within 30 seconds.' : ''}</p>
-        )}
-      </section>
-
-      <section className="stack">
-        <h2 className="title-lg">History</h2>
-        {rows.length > 0 && (
+        <h2 className="title-lg">{oneDay ? `Trades · ${dateLong(from)}` : 'Trades'}</h2>
+        {!oneDay && rows.length > 1 && (
           <div className="card">
             <PnlBars rows={rows} label={(r) => dateShort(r.key)} />
           </div>
         )}
-        {history.length ? (
-          <TradesTable trades={history} selected={selected} onSelect={select} showDate />
+        {data.trades.length ? (
+          <TradesTable trades={data.trades} selected={selected} onSelect={select} showDate={!oneDay} />
         ) : (
-          <p className="caption">No paper trades in the last {days} days.</p>
+          <p className="caption">
+            No paper trades {oneDay ? `on ${dateLong(from)}` : `from ${dateShort(from)} to ${dateShort(to)}`}
+            {from === today ? '. Refresh to see new breakouts.' : '.'}
+          </p>
         )}
       </section>
 
