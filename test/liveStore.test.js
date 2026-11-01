@@ -90,3 +90,15 @@ test('loadWatchlist reads the named watchlist from Postgres', { skip: noDb }, ()
     assert.deepEqual(await loadWatchlist(pool, 'core'), ['NSE:A-EQ', 'NSE:B-EQ']);
     assert.deepEqual(await loadWatchlist(pool, 'missing'), []);
   }));
+
+test('an open position loads with its levels from paper_trades (D24)', { skip: noDb }, () =>
+  withStore(async (store) => {
+    await store.logDecision(DATE, { kind: 'ENTRY', symbol: 'NSE:A-EQ', side: 'short', price: 1658.2, quantity: 30, sl: 1674.78, target: 1633.33, time: '09:55' });
+    await store.save({ date: DATE, symbols: { 'NSE:A-EQ': { position: 'OPEN' }, 'NSE:B-EQ': { position: 'CLOSED' } } });
+    const { symbols } = await store.load(DATE);
+    assert.deepEqual(
+      { ...symbols['NSE:A-EQ'], entry: Number(symbols['NSE:A-EQ'].entry), sl: Number(symbols['NSE:A-EQ'].sl), target: Number(symbols['NSE:A-EQ'].target) },
+      { position: 'OPEN', side: 'short', entry: 1658.2, sl: 1674.78, target: 1633.33, quantity: 30, entryTime: '09:55' }
+    );
+    assert.deepEqual(symbols['NSE:B-EQ'], { position: 'CLOSED' });
+  }));

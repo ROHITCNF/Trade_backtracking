@@ -6,7 +6,7 @@
 
 import { connectFyers } from '../lib/me.jsx';
 import { dateLong, pnl, price, qty, rMultiple, tone } from '../lib/format.js';
-import { REASON, checkText, held, rOf, short, tradeStory, tsOn } from '../lib/liveView.js';
+import { REASON, checkText, held, rOf, short, tickText, tradeStory, tsOn } from '../lib/liveView.js';
 import TradeChart from './TradeChart.jsx';
 import Segmented from './Segmented.jsx';
 
@@ -128,6 +128,7 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
       )}
 
       {m && <div className="banner banner-warn live-check">{checkText(m, t)}</div>}
+      {!m && row.check?.kind === 'tick' && <div className="banner banner-info live-check">{tickText(row.check)}</div>}
 
       {story && (
         <section className="stack live-story">
@@ -153,6 +154,9 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
         <Cell label="P&L" value={pnl(t.pnl)} className={tone(t.pnl)} />
         <Cell label="R" value={rMultiple(rOf(t))} className={tone(rOf(t))} />
         <Cell label="Held" value={t.status === 'open' ? '—' : held(t.entryTime, t.exitTime)} />
+        {row.check?.slippage != null && (
+          <Cell label="vs backtest" value={pnl(row.check.slippage)} className={tone(row.check.slippage)} />
+        )}
       </div>
     </div>
   );

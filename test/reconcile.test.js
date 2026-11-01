@@ -37,27 +37,40 @@ async function withDb(fn) {
   }
 }
 
-test('compare names the first difference', () => {
-  const bt = { side: 'long', entry: 101, exit: 102, reason: 'TARGET' };
-  const live = { side: 'long', entry: '101.000', exit: '102.00', reason: 'TARGET', status: 'closed' };
+test('compare: match, tick order, or mismatch', () => {
+  const bt = { side: 'long', entry: 101, exit: 102, reason: 'TARGET', entryTime: '09:30', exitTime: '09:40', sl: 99.99, target: 102.01 };
+  const live = { side: 'long', entry: '101.07', exit: '102.05', reason: 'TARGET', status: 'closed', entry_time: '09:30', exit_time: '09:40' };
+  const kind = (l, b, day) => compare(l, b, day)?.kind ?? null;
   assert.equal(compare(null, null), null);
-  assert.equal(compare(live, bt), null);
-  assert.equal(compare(null, bt), 'backtest traded, live did not');
-  assert.equal(compare(live, null), 'live traded, backtest did not');
-  assert.equal(compare({ ...live, side: 'short' }, bt), 'side differs');
-  assert.equal(compare({ ...live, entry: '101.10' }, bt), 'entry price differs');
-  assert.equal(compare({ ...live, status: 'open' }, bt), 'still open after the close');
-  assert.equal(compare({ ...live, reason: 'SL' }, bt), 'exit reason differs');
-  assert.equal(compare({ ...live, exit: '101.5' }, bt), 'exit price differs');
+  assert.equal(kind(live, bt), 'match', 'prices differ by slippage only');
+  assert.deepEqual(compare(null, bt), { kind: 'mismatch', problem: 'backtest traded, live did not' });
+  assert.deepEqual(compare(live, null), { kind: 'mismatch', problem: 'live traded, backtest did not' });
+  assert.equal(compare({ ...live, side: 'short' }, bt).problem, 'side differs');
+  assert.equal(compare({ ...live, entry_time: '09:31' }, bt).problem, 'entry time differs');
+  assert.equal(compare({ ...live, status: 'open' }, bt).problem, 'still open after the close');
+  assert.equal(compare({ ...live, reason: 'SL' }, bt).problem, 'exit reason differs');
+  assert.equal(compare({ ...live, exit_time: '09:41' }, bt).problem, 'exit time differs');
+
+  // The 09:40 candle touched both stop and target: the backtest says SL, live saw the target first.
+  const t = (m) => Date.UTC(2026, 0, 5, 0, 0) / 1000 - 19800 + m * 60;
+  const day = { at: new Map([[580, [t(580), 101.5, 102.5, 99.5, 100]]]), high: 101, low: 99 };
+  assert.equal(kind(live, { ...bt, reason: 'SL', exit: 99.99 }, day), 'tick');
+  // The 09:30 candle broke both edges: the backtest skipped it, live went long on the first break.
+  const both = { at: new Map([[570, [t(570), 100, 101.5, 98.5, 99]]]), high: 101, low: 99 };
+  assert.equal(kind(live, null, both), 'tick');
+  assert.equal(kind(live, { ...bt, side: 'short', entryTime: '09:31' }, both), 'tick');
 });
 
 test('a day where live matches the backtest reconciles clean', { skip: noDb }, () =>
   withDb(async (pool, store) => {
     await recordLive(store, btA);
     const r = await reconcileDay({ pool, date: DATE, symbols: ['NSE:A-EQ', 'NSE:B-EQ'], config: cfg, getCandles });
-    assert.deepEqual(r, { date: DATE, checked: 2, matched: 2, backfilled: 0, mismatches: [] });
-    const { rows } = await pool.query('select checked, matched, mismatches from paper_reconciliations');
-    assert.deepEqual(rows, [{ checked: 2, matched: 2, mismatches: [] }]);
+    assert.deepEqual([r.checked, r.matched, r.expected, r.backfilled, r.mismatches], [2, 2, 0, 0, []]);
+    assert.deepEqual(r.notes.map((n) => [n.symbol, n.kind, n.slippage]), [['NSE:A-EQ', 'match', 0]]);
+    const { rows } = await pool.query('select checked, matched, mismatches, notes from paper_reconciliations');
+    assert.equal(rows[0].matched, 2);
+    assert.deepEqual(rows[0].mismatches, []);
+    assert.equal(rows[0].notes[0].kind, 'match');
   }));
 
 test('a mismatching day records what differs, per symbol', { skip: noDb }, () =>
@@ -78,6 +91,30 @@ test('a mismatching day records what differs, per symbol', { skip: noDb }, () =>
     await reconcileDay({ pool, date: DATE, symbols: ['NSE:A-EQ'], config: cfg, getCandles });
     const { rows } = await pool.query('select count(*)::int as n from paper_reconciliations');
     assert.equal(rows[0].n, 1);
+  }));
+
+test('tick fills are a match with slippage; a both-touched exit candle is tick order', { skip: noDb }, () =>
+  withDb(async (pool, store) => {
+    const days = {
+      ...DAYS,
+      // C: long at 09:30; 09:31 touches the 102.01 target and the 99.99 stop.
+      'NSE:C-EQ': [...openingRange(DATE), candle(DATE, '09:30', 101, 101.4, 100.9, 101.2), candle(DATE, '09:31', 101.2, 102.5, 99.5, 100)],
+    };
+    const get = async ({ symbol }) => days[symbol] || [];
+    await recordLive(store, btA, { entry: 101.05, exit: 102.1, pnl: btA.pnl - 2 });
+    const btC = runBacktest(days['NSE:C-EQ'], { ...cfg, symbol: 'NSE:C-EQ' })[0];
+    assert.equal(btC.reason, 'SL');
+    await store.logDecision(DATE, { kind: 'ENTRY', symbol: 'NSE:C-EQ', side: 'long', price: 101.02, quantity: btC.quantity, sl: btC.sl, target: btC.target, time: '09:30' });
+    await store.logDecision(DATE, { kind: 'EXIT', symbol: 'NSE:C-EQ', side: 'long', price: 102.02, quantity: btC.quantity, reason: 'TARGET', pnl: 40, time: '09:31' });
+
+    const r = await reconcileDay({ pool, date: DATE, symbols: ['NSE:A-EQ', 'NSE:C-EQ'], config: cfg, getCandles: get });
+    assert.deepEqual(r.mismatches, []);
+    assert.equal(r.matched, 1);
+    assert.equal(r.expected, 1);
+    const byS = Object.fromEntries(r.notes.map((n) => [n.symbol, n]));
+    assert.deepEqual([byS['NSE:A-EQ'].kind, byS['NSE:A-EQ'].slippage], ['match', -2]);
+    assert.equal(byS['NSE:C-EQ'].kind, 'tick');
+    assert.match(byS['NSE:C-EQ'].problem, /touched both stop and target/);
   }));
 
 test('a day the session never ran is backfilled from the backtest', { skip: noDb }, () =>

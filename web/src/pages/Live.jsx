@@ -39,13 +39,14 @@ function Notice({ notice }) {
 
 function CheckStat({ counts, checkedDays, onShow }) {
   if (!checkedDays) return <Stat label="Checked against backtest" value="Not yet" sub="checked after each close" />;
-  if (!counts.review) return <Stat label="Checked against backtest" value="All match" className="profit" sub={`${qty(checkedDays)} day${checkedDays === 1 ? '' : 's'} checked`} />;
+  const tick = counts.tick ? ` · ${qty(counts.tick)} tick order` : '';
+  if (!counts.review) return <Stat label="Checked against backtest" value="All match" className="profit" sub={`${qty(checkedDays)} day${checkedDays === 1 ? '' : 's'} checked${tick}`} />;
   return (
     <div className="stat-card">
       <span className="label">Checked against backtest</span>
       <span className="stat warn">{qty(counts.review)} to review</span>
       <button type="button" className="link-btn accent caption live-show" onClick={onShow}>
-        {counts.differ} differ · {counts.missed} missed — show
+        {counts.differ} differ · {counts.missed} missed{tick} — show
       </button>
     </div>
   );

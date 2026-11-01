@@ -114,9 +114,10 @@ version in sync with the `addCandlestickSeries` / `addAreaSeries` calls in the t
 
 ## Live runner
 
-`server/` runs the same `runBacktest` on live websocket ticks and records paper decisions to
-`data/live/`. It places no orders. `src/engine.js` stays the only place strategy logic lives; see
-`server/architecture.md` before touching it.
+`server/` runs the same `runBacktest` on live websocket ticks to find the entry, then manages the
+open position on the socket's prices (tick-price fills, first tick through stop/target exits; D24)
+and records paper decisions to `data/live/`. It places no orders. `src/engine.js` stays the only
+place the entry rules and levels live; see `server/architecture.md` before touching it.
 
 The deployed API hosts the same session (`server/session.js` via `api/live.js`, on when
 `LIVE_ENABLED=true`) with state in Postgres (`paper_trades`, `live_state`, `live_decisions`), and

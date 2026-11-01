@@ -40,6 +40,7 @@ function Row({ row, maxAbs, selected, onSelect }) {
         <div className="live-row-sub">
           <span className="caption">{sub}</span>
           {row.tag && <span className="warn-tag">{row.tag}</span>}
+          {!row.tag && row.check?.kind === 'tick' && <span className="tag tick-tag" title={row.check.problem}>tick order</span>}
           <span className="spacer" />
           <span className="live-bar"><span className={`${tone(row.pnl)}-bg`} style={{ width: `${width}%` }} /></span>
         </div>

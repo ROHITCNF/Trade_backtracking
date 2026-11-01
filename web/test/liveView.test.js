@@ -39,7 +39,7 @@ test('rows: traded, missed from the check, and the rest of the list on one day',
   ]);
   assert.equal(tabRows(rows, 'traded').length, 2);
   assert.equal(tabRows(rows, 'review').length, 2);
-  assert.deepEqual(reviewCounts(rows), { review: 2, missed: 1, differ: 1 });
+  assert.deepEqual(reviewCounts(rows), { review: 2, missed: 1, differ: 1, tick: 0 });
   assert.deepEqual(sortRows(rows, 'time').map((r) => r.symbol), ['NSE:B-EQ', 'NSE:A-EQ', 'NSE:M-EQ', 'NSE:N-EQ', 'NSE:X-EQ']);
   assert.deepEqual(sortRows(rows, 'pnl').map((r) => r.symbol).slice(0, 3), ['NSE:A-EQ', 'NSE:B-EQ', 'NSE:M-EQ']);
 
@@ -81,4 +81,14 @@ test('backtest check text', () => {
     'Backtest check: entry price differs — backtest entered at 1,657.90, live entered at 1,658.20. Shown as the dashed circle.'
   );
   assert.match(checkText({ problem: 'backtest traded, live did not', backtest: { side: 'short', entry: 50, exit: 49, reason: 'EOD', entryTime: '09:50' } }), /^Live didn’t trade this\. The backtest went short at 50\.00 \(09:50\)/);
+});
+
+test('tick-order notes are expected: tagged, counted apart, never under Review', async () => {
+  const { tickText } = await import('../src/lib/liveView.js');
+  const note = { symbol: 'NSE:A-EQ', kind: 'tick', problem: 'one candle touched both stop and target; the backtest assumes the stop, live saw which came first', slippage: 25, backtest: { reason: 'SL', pnl: -10 } };
+  const rows = buildRows({ trades: [trade('NSE:A-EQ')], reconciliations: [{ date: D, mismatches: [], notes: [note] }], symbols: null, oneDay: true, date: D });
+  assert.equal(rows[0].check.kind, 'tick');
+  assert.equal(tabRows(rows, 'review').length, 0);
+  assert.deepEqual(reviewCounts(rows), { review: 0, missed: 0, differ: 0, tick: 1 });
+  assert.equal(tickText(note), 'Tick order (expected): one candle touched both stop and target; the backtest assumes the stop, live saw which came first. The backtest exited on Stop for −₹10.');
 });

@@ -44,7 +44,11 @@ export const REASON = { SL: 'Stop', TARGET: 'Target', EOD: 'EOD' };
 // a 'none' row (no breakout, or not traded live at all).
 export function buildRows({ trades, reconciliations, symbols, missing = [], oneDay, date }) {
   const checks = new Map();
-  for (const r of reconciliations) for (const m of r.mismatches) checks.set(rowKey(r.date, m.symbol), m);
+  const notes = new Map(); // D24: 'match' (with slippage) and 'tick' (expected) verdicts
+  for (const r of reconciliations) {
+    for (const m of r.mismatches) checks.set(rowKey(r.date, m.symbol), m);
+    for (const n of r.notes || []) notes.set(rowKey(r.date, n.symbol), n);
+  }
   const checked = new Set(reconciliations.map((r) => r.date));
   const rows = [];
   const seen = new Set();
@@ -53,7 +57,8 @@ export function buildRows({ trades, reconciliations, symbols, missing = [], oneD
     const key = rowKey(t.date, t.symbol);
     seen.add(key);
     const m = checks.get(key) || null;
-    rows.push({ key, kind: 'traded', date: t.date, symbol: t.symbol, side: t.side, entryTime: t.entryTime, pnl: t.pnl, r: rOf(t), trade: t, mismatch: m, tag: m && mismatchKind(m).tag });
+    const note = notes.get(key) || null;
+    rows.push({ key, kind: 'traded', date: t.date, symbol: t.symbol, side: t.side, entryTime: t.entryTime, pnl: t.pnl, r: rOf(t), trade: t, mismatch: m, tag: m && mismatchKind(m).tag, check: note });
   }
   for (const [key, m] of checks) {
     if (seen.has(key) || mismatchKind(m).kind !== 'missed') continue;
@@ -94,11 +99,20 @@ export function sortRows(rows, by) {
   });
 }
 
-// Counts for the "Checked against backtest" card over the range.
+// Counts for the "Checked against backtest" card over the range. Tick-order
+// differences are expected (D24) and counted apart from the ones to review.
 export function reviewCounts(rows) {
   const review = rows.filter((r) => r.mismatch);
   const missed = review.filter((r) => mismatchKind(r.mismatch).kind === 'missed').length;
-  return { review: review.length, missed, differ: review.length - missed };
+  const tick = rows.filter((r) => r.check?.kind === 'tick').length;
+  return { review: review.length, missed, differ: review.length - missed, tick };
+}
+
+// The grey line for a tick-order difference: what the backtest had to guess.
+export function tickText(note) {
+  const bt = note.backtest;
+  const what = bt ? ` The backtest ${bt.reason ? `exited on ${REASON[bt.reason] || bt.reason}` : 'went another way'}${bt.pnl != null ? ` for ${pnl(bt.pnl)}` : ''}.` : ' The backtest has no trade.';
+  return `Tick order (expected): ${note.problem}.${what}`;
 }
 
 // '5 h 19 m' / '42 m' between two 'HH:MM' times.
@@ -178,6 +192,8 @@ export function checkText(m, trade) {
   }
   if (/live traded, backtest did not/.test(p)) return 'Backtest check: the backtest has no trade for this symbol on this day.';
   if (/^entry/.test(p)) return `Backtest check: entry price differs — backtest entered at ${price(bt.entry)}, live entered at ${price(lv.entry ?? trade?.entry)}. Shown as the dashed circle.`;
+  if (/^entry time/.test(p)) return `Backtest check: entry time differs — backtest entered at ${bt.entryTime || '—'}, live at ${lv.entryTime || trade?.entryTime || '—'}.`;
+  if (/^exit time/.test(p)) return `Backtest check: exit time differs — backtest exited at ${bt.exitTime || '—'} (${REASON[bt.reason] || bt.reason}), live at ${lv.exitTime || trade?.exitTime || '—'}.`;
   if (/^exit price/.test(p)) return `Backtest check: exit price differs — backtest exited at ${price(bt.exit)}, live exited at ${price(lv.exit ?? trade?.exit)}.`;
   if (/^exit reason/.test(p)) return `Backtest check: exit differs — backtest exited on ${REASON[bt.reason] || bt.reason} at ${price(bt.exit)}, live on ${REASON[lv.reason] || lv.reason} at ${price(lv.exit)}.`;
   if (/^side/.test(p)) return `Backtest check: side differs — backtest went ${side(bt.side)}, live went ${side(lv.side)}.`;

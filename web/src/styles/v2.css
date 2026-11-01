@@ -298,3 +298,4 @@ button.live-row:hover { background: var(--surface-2); }
   .live-grid { grid-template-columns: 1fr 1fr; }
   .timeline li { grid-template-columns: 46px 12px minmax(0, 1fr); font-size: 14px; }
 }
+.tick-tag { font-size: 12px; padding: 1px 7px; color: var(--ink-3); white-space: nowrap; }

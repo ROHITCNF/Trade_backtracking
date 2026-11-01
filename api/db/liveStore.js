@@ -4,9 +4,21 @@
 
 function createLiveStore(pool) {
   return {
+    // An open position comes back with its levels from paper_trades, so a
+    // restart keeps managing it on ticks (D24).
     async load(date) {
-      const { rows } = await pool.query('select symbol, position from live_state where date = $1', [date]);
-      return { date, symbols: Object.fromEntries(rows.map((r) => [r.symbol, { position: r.position }])) };
+      const { rows } = await pool.query(
+        `select s.symbol, s.position, p.side, p.entry, p.sl, p.target, p.quantity, p.entry_time as "entryTime"
+         from live_state s left join paper_trades p on p.date = s.date and p.symbol = s.symbol and p.status = 'open'
+         where s.date = $1`,
+        [date]
+      );
+      return {
+        date,
+        symbols: Object.fromEntries(
+          rows.map(({ symbol, position, ...p }) => [symbol, position === 'OPEN' && p.side ? { position, ...p } : { position }])
+        ),
+      };
     },
 
     // Upserts every symbol in the snapshot. Saving the same state twice is a no-op.
