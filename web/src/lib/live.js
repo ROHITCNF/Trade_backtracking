@@ -2,6 +2,7 @@
 // per-day rows for its P&L chart. Pure, so the rules are tested in web/test.
 
 import { istParts } from './ist.js';
+import { addDays, addMonths } from './dates.js';
 
 // The API's scheduler starts the session at 09:10 IST and stops it a few
 // minutes after the 15:14 exit; 15:30 matches the market pill.
@@ -62,4 +63,27 @@ export function reconLabel(r) {
   else if (r.backfilled === 0 || r.matched > 0) parts.push(`${r.matched}/${r.checked} matched`);
   if (r.backfilled) parts.push(`${r.backfilled} backfilled`);
   return { text: parts.join(' · '), tone: r.mismatches.length ? 'loss' : 'profit' };
+}
+
+// The Live page's range buttons. 'day' is one day: the last trading day
+// (the newest day with a paper trade, from /api/live/status) or today when
+// there is none yet. The others end today. 'custom' takes the picked dates.
+export const RANGES = [['day', 'Day'], ['15d', '15D'], ['1m', '1M'], ['1y', '1Y'], ['custom', 'Custom']];
+
+export function liveRange(range, { today, lastTradeDate, custom }) {
+  switch (range) {
+    case 'day': {
+      const d = lastTradeDate || today;
+      return { from: d, to: d };
+    }
+    case '15d': return { from: addDays(today, -14), to: today };
+    case '1m': return { from: addDays(addMonths(today, -1), 1), to: today };
+    case '1y': return { from: addDays(addMonths(today, -12), 1), to: today };
+    default: return { from: custom.from, to: custom.to };
+  }
+}
+
+// The list the page opens on: 'final' if it exists, else the first one.
+export function defaultWatchlist(watchlists) {
+  return (watchlists.find((w) => w.name === 'final') || watchlists[0])?.id ?? null;
 }

@@ -63,3 +63,21 @@ test('reconciliation verdicts', async () => {
   assert.deepEqual(reconLabel({ checked: 39, matched: 37, backfilled: 0, mismatches: [{}, {}] }), { text: '2 mismatches', tone: 'loss' });
   assert.deepEqual(reconLabel({ checked: 39, matched: 0, backfilled: 4, mismatches: [] }), { text: '4 backfilled', tone: 'profit' });
 });
+
+test('range buttons: Day is the last trading day, the rest end today', async () => {
+  const { liveRange } = await import('../src/lib/live.js');
+  const ctx = { today: '2026-11-02', lastTradeDate: '2026-10-30', custom: { from: '2026-10-01', to: '2026-10-05' } };
+  assert.deepEqual(liveRange('day', ctx), { from: '2026-10-30', to: '2026-10-30' });
+  assert.deepEqual(liveRange('day', { ...ctx, lastTradeDate: null }), { from: '2026-11-02', to: '2026-11-02' });
+  assert.deepEqual(liveRange('15d', ctx), { from: '2026-10-19', to: '2026-11-02' });
+  assert.deepEqual(liveRange('1m', ctx), { from: '2026-10-03', to: '2026-11-02' });
+  assert.deepEqual(liveRange('1y', ctx), { from: '2025-11-03', to: '2026-11-02' });
+  assert.deepEqual(liveRange('custom', ctx), { from: '2026-10-01', to: '2026-10-05' });
+});
+
+test('the page opens on final, else the first list', async () => {
+  const { defaultWatchlist } = await import('../src/lib/live.js');
+  assert.equal(defaultWatchlist([{ id: 1, name: 'core' }, { id: 2, name: 'final' }]), 2);
+  assert.equal(defaultWatchlist([{ id: 1, name: 'core' }]), 1);
+  assert.equal(defaultWatchlist([]), null);
+});
