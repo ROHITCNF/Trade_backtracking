@@ -127,3 +127,42 @@ test('paper trade candles come with its opening range and marker times', { skip:
     assert.equal((await call('/api/paper-trades/2026-01-05/NSE:NOTOKEN-EQ/candles')).statusCode, 409);
   }, { getCandles });
 });
+
+test('a watchlist narrows trades, totals and reconciliations, and reports what live misses', { skip: noDb }, () =>
+  withApi(async ({ call, pool }) => {
+    const mk = async (name, symbols) => {
+      const { rows } = await pool.query(`insert into watchlists (name, source) values ($1, 'custom') returning id`, [name]);
+      await pool.query(`insert into watchlist_symbols (watchlist_id, symbol) select $1, unnest($2::text[])`, [rows[0].id, symbols]);
+      return Number(rows[0].id);
+    };
+    await mk('live', ['NSE:A-EQ', 'NSE:B-EQ', 'NSE:C-EQ']);
+    const final = await mk('final', ['NSE:A-EQ', 'NSE:C-EQ', 'NSE:Z-EQ']);
+
+    const store = createLiveStore(pool);
+    await store.logDecision('2026-01-05', ev('ENTRY', 'NSE:A-EQ', { price: 100, sl: 99 }));
+    await store.logDecision('2026-01-05', ev('EXIT', 'NSE:A-EQ', { price: 101, reason: 'TARGET', pnl: 10, time: '10:00' }));
+    await store.logDecision('2026-01-05', ev('ENTRY', 'NSE:B-EQ', { price: 50, sl: 49 }));
+    await store.logDecision('2026-01-05', ev('EXIT', 'NSE:B-EQ', { price: 49, reason: 'SL', pnl: -10, time: '10:05' }));
+    await pool.query(
+      `insert into paper_reconciliations (date, checked, matched, backfilled, mismatches) values ('2026-01-05', 3, 2, 0, $1)`,
+      [JSON.stringify([{ symbol: 'NSE:C-EQ', problem: 'backtest traded, live did not' }, { symbol: 'NSE:B-EQ', problem: 'x' }])]
+    );
+
+    const all = (await call('/api/paper-trades?from=2026-01-05&to=2026-01-05')).json();
+    assert.equal(all.trades.length, 2);
+    assert.equal(all.coverage, undefined);
+
+    const body = (await call(`/api/paper-trades?from=2026-01-05&to=2026-01-05&watchlist=${final}`)).json();
+    assert.deepEqual(body.trades.map((t) => t.symbol), ['NSE:A-EQ']);
+    assert.equal(body.summary.netPnl, 10);
+    assert.deepEqual(body.coverage, { watchlist: { id: final, name: 'final' }, symbols: 3, live: 2, missing: ['NSE:Z-EQ'] });
+    const [r] = body.reconciliations;
+    assert.deepEqual([r.checked, r.matched, r.backfilled], [2, 1, 0]);
+    assert.deepEqual(r.mismatches.map((m) => m.symbol), ['NSE:C-EQ']);
+
+    assert.equal((await call('/api/paper-trades?watchlist=999999')).statusCode, 404);
+    assert.equal((await call('/api/paper-trades?watchlist=abc')).statusCode, 400);
+
+    const status = (await call('/api/live/status')).json();
+    assert.equal(status.lastTradeDate, '2026-01-05');
+  }));

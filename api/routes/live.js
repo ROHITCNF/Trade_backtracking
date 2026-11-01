@@ -51,6 +51,18 @@ const afterClose = (date, now = Date.now()) => {
 
 const daysBefore = (date, n) => istParts(dateToEpoch(date) - n * 86400).date;
 
+// A day's reconciliation seen through one watchlist (D22): only its symbols'
+// mismatches, and counts over the part of the list the live session trades.
+// Matched isn't stored per symbol, but on a day the session ran every checked
+// symbol either matched or is a mismatch, so it follows from the two.
+function reconForList(r, { listed, live, backfilledOn }) {
+  const mismatches = r.mismatches.filter((m) => listed.has(m.symbol));
+  const checked = [...listed].filter((s) => live.has(s)).length;
+  const backfilled = backfilledOn.get(r.date) || 0;
+  const matched = r.matched > 0 ? Math.max(0, checked - mismatches.length) : 0;
+  return { ...r, checked, matched, backfilled, mismatches };
+}
+
 // What the trade chart needs beyond the stored row: the opening range from the
 // day's candles, and epoch seconds for the entry and exit markers.
 function chartTrade(trade, candles, { orbStart, orbEnd }) {
@@ -73,22 +85,47 @@ function chartTrade(trade, candles, { orbStart, orbEnd }) {
 async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = fetchCandles, config = baseConfig } = {}) {
   const db = app.db;
 
+  const liveWatchlist = () => app.live?.status().watchlist || 'live';
+
   app.get('/api/live/status', async () => {
     const live = app.live ? app.live.status() : { enabled: false, watchlist: null, lastError: null, session: null };
     const { connected } = await tokenStatus();
-    return { ...live, tokenConnected: connected, today: istToday() };
+    const today = istToday();
+    // The last trading day without a holiday calendar: the newest day with a
+    // paper trade. The Live page opens on it.
+    const { rows } = await db.query('select max(date)::text as d from paper_trades where date <= $1', [today]);
+    return { ...live, tokenConnected: connected, today, lastTradeDate: rows[0].d };
   });
 
   app.get(
     '/api/paper-trades',
-    { schema: { querystring: { type: 'object', properties: { from: DATE, to: DATE } } } },
+    { schema: { querystring: { type: 'object', properties: { from: DATE, to: DATE, watchlist: { type: 'integer', minimum: 1 } } } } },
     async (request) => {
       const to = request.query.to || istToday();
       const from = request.query.from || daysBefore(to, DEFAULT_DAYS - 1);
+      const listId = request.query.watchlist;
+
+      // With a watchlist, everything below narrows to its symbols (D22).
+      let listed = null;
+      let liveSet = null;
+      let coverage = null;
+      if (listId) {
+        const list = await db.query('select id, name from watchlists where id = $1', [listId]);
+        if (!list.rows.length) throw httpError(404, 'Watchlist not found');
+        listed = new Set(
+          (await db.query('select symbol from watchlist_symbols where watchlist_id = $1', [listId])).rows.map((r) => r.symbol)
+        );
+        liveSet = new Set(await loadWatchlist(db, liveWatchlist()));
+        // The list's symbols the live session doesn't trade, so never get a paper trade.
+        const missing = [...listed].filter((s) => !liveSet.has(s)).sort();
+        coverage = { watchlist: { id: Number(list.rows[0].id), name: list.rows[0].name }, symbols: listed.size, live: listed.size - missing.length, missing };
+      }
+
       const { rows } = await db.query(
         `select ${TRADE_COLUMNS} from paper_trades where date between $1 and $2
+           and ($3::text[] is null or symbol = any($3))
          order by date desc, entry_time desc, symbol`,
-        [from, to]
+        [from, to, listed ? [...listed] : null]
       );
       const trades = rows.map(rowToTrade);
       const rec = await db.query(
@@ -96,7 +133,13 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
          from paper_reconciliations where date between $1 and $2 order by date desc`,
         [from, to]
       );
-      return { from, to, trades, ...summarize(trades), reconciliations: rec.rows };
+      let reconciliations = rec.rows;
+      if (listed) {
+        const backfilledOn = new Map();
+        for (const t of trades) if (t.source === 'backtest') backfilledOn.set(t.date, (backfilledOn.get(t.date) || 0) + 1);
+        reconciliations = reconciliations.map((r) => reconForList(r, { listed, live: liveSet, backfilledOn }));
+      }
+      return { from, to, trades, ...summarize(trades), reconciliations, ...(coverage && { coverage }) };
     }
   );
 
@@ -120,7 +163,7 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
     async (request) => {
       const { date } = request.params;
       if (!afterClose(date)) throw httpError(409, 'The day isn’t over yet.');
-      const symbols = await loadWatchlist(db, app.live?.status().watchlist || 'live');
+      const symbols = await loadWatchlist(db, liveWatchlist());
       try {
         return await reconcileDay({ pool: db, date, symbols, config, getCandles });
       } catch (err) {
