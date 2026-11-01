@@ -41,3 +41,9 @@ v1's decisions above still hold unless one below overrides them.
 | D19 | **Sweeps are dropped from the UI.** The API keeps supporting them. | Not in the v2 design; comparing ticked Research runs covers the need. |
 | D20 | **The ticker page stays** (`/runs/:id/symbols/:symbol`), restyled to v2. **Run progress is shown inline** on the Research card. | No v2 mockup replaces either; "click a symbol to see its trades" needs the ticker page. |
 | D21 | **Day P&L for the heatmap comes from the run's equity curve**, differenced per trade and grouped by date. | `/api/runs/:id/analysis` already returns it in entry order; no per-day endpoint is needed (D15). |
+
+## 2026-11-01 — Live paper: the `live` list and the watchlist filter
+
+| # | decision | why |
+|---|---|---|
+| D22 | **The live session trades a seeded, read-only list `live` (95 symbols): every core and final symbol, deduplicated, plus 45 random F&O symbols.** `LIVE_WATCHLIST` defaults to it, and the scheduler refuses any list over 100 symbols. The Live page filters paper trades by any watchlist (opening on `final`) through `GET /api/paper-trades?watchlist=<id>`, and says which of a list's symbols live doesn't trade. This overrides D15 for the paper-trade endpoints only. | Fyers Standard caps the data websocket at 100 symbols per account across all connections, so F&O 207 can't be watched live. 95 leaves headroom for a reconnect that overlaps the old connection. Read-only keeps the backend set fixed; filtering is a view. Random filler avoids picking symbols by past results. Reconciliation goes from 39 to 95 REST calls a day. |

@@ -131,7 +131,7 @@ test('stop() ends a running session; disabled scheduler never starts one', async
 
 test('LIVE_ENABLED and LIVE_WATCHLIST are read from the environment', () => {
   const env = { DATABASE_URL: 'x', APP_PASSWORD_HASH: 'h', SESSION_SECRET: 's'.repeat(32) };
-  assert.deepEqual(loadConfig(env).live, { enabled: false, watchlist: 'core' });
+  assert.deepEqual(loadConfig(env).live, { enabled: false, watchlist: 'live' });
   assert.deepEqual(loadConfig({ ...env, LIVE_ENABLED: 'true', LIVE_WATCHLIST: 'final' }).live, { enabled: true, watchlist: 'final' });
 });
 
@@ -161,4 +161,14 @@ test('a failed reconcile is reported and not retried all evening', async () => {
   await h.at('2026-01-05', '15:26');
   assert.equal(h.reconciles.length, 1);
   assert.match(h.scheduler.status().lastError, /reconcile failed: REST budget/);
+});
+
+test('refuses a watchlist over the 100-symbol websocket cap', async () => {
+  const symbols = Array.from({ length: 101 }, (_, i) => `NSE:S${i}-EQ`);
+  const h = harness({ symbols });
+  await h.at('2026-01-05', '09:10');
+  await h.at('2026-01-05', '09:11');
+  assert.equal(h.sessions.length, 0);
+  assert.match(h.scheduler.status().lastError, /101 symbols; the Fyers websocket allows 100/);
+  assert.equal(h.logs.filter((m) => /websocket allows/.test(m)).length, 1, 'logged once');
 });

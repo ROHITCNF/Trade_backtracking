@@ -52,8 +52,8 @@ services:
         value: "3800"
       - key: LIVE_ENABLED # paper trading on market days (api/live.js); no orders
         value: "true"
-      - key: LIVE_WATCHLIST # watchlist name the live session trades
-        value: core
+      - key: LIVE_WATCHLIST # watchlist name the live session trades (D22: ≤100 symbols)
+        value: live
 
   # The React app, built to static files. Every path falls back to index.html
   # so client-side routes survive a reload.

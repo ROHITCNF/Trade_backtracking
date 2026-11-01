@@ -17,6 +17,9 @@ const { istParts, toMinutes, IST_OFFSET_SECONDS } = require('../src/time');
 
 const START_AT = toMinutes('09:10'); // early enough to connect before the 09:15 open
 const STOP_GRACE_MIN = 5; // after sessionEnd, so the last minute's candle exists over REST
+// Fyers Standard allows 100 data-websocket symbols per account, across every
+// connection (D22). Over it the subscription fails, so refuse up front.
+const MAX_SYMBOLS = 100;
 
 async function loadWatchlist(pool, name) {
   const { rows } = await pool.query(
@@ -92,6 +95,12 @@ function createLiveScheduler({
       waiting = `${date}:list`;
       return;
     }
+    if (symbols.length > MAX_SYMBOLS) {
+      lastError = `watchlist "${watchlist}" has ${symbols.length} symbols; the Fyers websocket allows ${MAX_SYMBOLS}`;
+      if (waiting !== `${date}:list`) log(lastError);
+      waiting = `${date}:list`;
+      return;
+    }
 
     const next = createSession({ symbols, config, store, date, log: (msg) => log(msg) });
     try {
@@ -162,4 +171,4 @@ function createLiveScheduler({
   return { start, stop, status, tick };
 }
 
-module.exports = { createLiveScheduler, loadWatchlist };
+module.exports = { MAX_SYMBOLS, createLiveScheduler, loadWatchlist };

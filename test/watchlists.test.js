@@ -66,7 +66,7 @@ test('seed runs once from lists/*.txt; F&O is read-only', { skip: noDb }, () =>
   withApi(async ({ call, pool }) => {
     const seeded = await seedWatchlists(pool);
     const fno = readTickers('fno.txt');
-    assert.deepEqual(seeded, ['core', 'final', `F&O – ${fno.length}`]);
+    assert.deepEqual(seeded, ['core', 'final', `F&O – ${fno.length}`, 'live']);
     assert.deepEqual(await seedWatchlists(pool), [], 'second boot does nothing');
 
     const lists = (await call('GET', '/api/watchlists')).json().watchlists;
@@ -74,6 +74,7 @@ test('seed runs once from lists/*.txt; F&O is read-only', { skip: noDb }, () =>
       ['core', readTickers('core.txt').length, false, 'seed'],
       ['final', readTickers('final.txt').length, false, 'seed'],
       [`F&O – ${fno.length}`, fno.length, true, 'seed'],
+      ['live', readTickers('live.txt').length, true, 'seed'],
     ]);
 
     const fnoId = lists[2].id;
@@ -88,6 +89,23 @@ test('seed runs once from lists/*.txt; F&O is read-only', { skip: noDb }, () =>
     const exported = await call('GET', `/api/watchlists/${fnoId}/export`);
     assert.equal(exported.body.trim().split('\n').length, fno.length);
   }));
+
+test('an ensured seed (live) reaches a database seeded before it existed', { skip: noDb }, () =>
+  withApi(async ({ pool }) => {
+    await pool.query(`insert into watchlists (name, source) values ('core', 'seed')`);
+    assert.deepEqual(await seedWatchlists(pool), ['live'], 'only the ensured list is added');
+    assert.deepEqual(await seedWatchlists(pool), []);
+  }));
+
+test('lists/live.txt: every core and final symbol, all F&O, no duplicates, under the websocket cap', () => {
+  const live = readTickers('live.txt');
+  const raw = require('fs').readFileSync(path.join(__dirname, '..', 'lists', 'live.txt'), 'utf8').split(',').filter(Boolean);
+  assert.equal(raw.length, live.length, 'no duplicates');
+  assert.ok(live.length <= 100);
+  const fno = new Set(readTickers('fno.txt'));
+  for (const s of [...readTickers('core.txt'), ...readTickers('final.txt')]) assert.ok(live.includes(s), `${s} missing`);
+  for (const s of live) assert.ok(fno.has(s), `${s} not in F&O`);
+});
 
 test('create, rename, add and remove symbols, delete', { skip: noDb }, () =>
   withApi(async ({ call }) => {
