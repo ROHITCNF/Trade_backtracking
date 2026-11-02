@@ -1,0 +1,75 @@
+/* Tailwind for the shadcn/ui components (src/components/ui) only. Tailwind's
+   preflight is left out on purpose: it would reset every screen's styling.
+   The bits of it shadcn relies on are applied inside shadcn's own elements
+   ([data-slot]) instead, and shadcn's colour variables point at our tokens, so
+   the components follow the light and dark themes (D13). */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+/* Utilities are generated from the shadcn files only, so our own class names
+   (row, table, hidden, grid…) never pick up a Tailwind rule. */
+@source '../components/ui';
+@source '../components/DatePicker.jsx';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is([data-theme='dark'] *));
+
+@layer base {
+  [data-slot],
+  [data-slot] *,
+  [data-slot] ::before,
+  [data-slot] ::after {
+    box-sizing: border-box;
+    border: 0 solid;
+    margin: 0;
+    padding: 0;
+  }
+  [data-slot] button,
+  button[data-slot] {
+    font: inherit;
+    color: inherit;
+    background-color: transparent;
+    border-radius: 0;
+    cursor: pointer;
+  }
+  [data-slot] table {
+    border-collapse: collapse;
+    text-indent: 0;
+  }
+  [data-slot] svg {
+    display: block;
+  }
+  [data-slot],
+  [data-slot] * {
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklab, var(--color-ring) 50%, transparent);
+  }
+}
+
+/* Mapped in @theme rather than as shadcn's usual :root variables, because
+   our tokens already use --accent and --muted with other meanings. */
+@theme inline {
+  --color-background: var(--surface);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--surface);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--ink-3);
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--loss);
+  --color-border: var(--line);
+  --color-input: var(--line-strong);
+  --color-ring: var(--accent);
+  --radius-sm: 4px;
+  --radius-md: var(--r-control);
+  --radius-lg: var(--r-input);
+  --radius-xl: var(--r-card);
+  --font-sans: var(--font);
+}

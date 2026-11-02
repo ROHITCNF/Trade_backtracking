@@ -16,6 +16,7 @@ import { buildRows, reviewCounts, sortRows, tabRows } from '../lib/liveView.js';
 import { useNarrow } from '../lib/useMedia.js';
 import { Stat } from '../components/Stat.jsx';
 import Segmented from '../components/Segmented.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 import Icon from '../components/Icon.jsx';
 import LiveList from '../components/LiveList.jsx';
 import LiveTrade from '../components/LiveTrade.jsx';
@@ -276,18 +277,15 @@ export default function Live() {
         {range === 'custom' ? (
           <>
             <label className="affix">From
-              <input className="input input-date" type="date" value={custom.from} max={custom.to}
-                onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })} />
+              <DatePicker label="From" value={custom.from} max={custom.to} onChange={(v) => setCustom({ ...custom, from: v })} />
             </label>
             <label className="affix">To
-              <input className="input input-date" type="date" value={custom.to} min={custom.from} max={today}
-                onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} />
+              <DatePicker label="To" value={custom.to} min={custom.from} max={today} onChange={(v) => setCustom({ ...custom, to: v })} />
             </label>
           </>
         ) : (
           <label className="affix">Date
-            <input className="input input-date" type="date" value={date} max={today}
-              onChange={(e) => { if (e.target.value) { setDate(e.target.value); setPicked(true); } }} />
+            <DatePicker label="Date" value={date} max={today} onChange={(v) => { setDate(v); setPicked(true); }} />
           </label>
         )}
         <label className="affix">List

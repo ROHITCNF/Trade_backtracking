@@ -15,6 +15,7 @@ import {
   allRuns, cardTitle, defaultStrategy, progressFacts, researchDraft, researchRuns, sameStrategy, strategyOf, weekdaysBetween,
 } from '../lib/research.js';
 import Segmented from '../components/Segmented.jsx';
+import DatePicker from '../components/DatePicker.jsx';
 import SymbolSearch from '../components/SymbolSearch.jsx';
 import SymbolSubset from '../components/SymbolSubset.jsx';
 import StrategyFields from '../components/StrategyFields.jsx';
@@ -133,12 +134,10 @@ function Launcher({ form, setForm, lists, strategy, onStarted }) {
       <div className="research-row">
         <Segmented value={form.range} options={RANGES} onChange={setRange} label="Date range" />
         <label className="affix">From
-          <input className="input input-date" type="date" value={form.fromDate} min={earliestFrom(today)} max={form.toDate}
-            onChange={(e) => set({ fromDate: e.target.value, range: 'custom' })} />
+          <DatePicker label="From" value={form.fromDate} min={earliestFrom(today)} max={form.toDate} onChange={(v) => set({ fromDate: v, range: 'custom' })} />
         </label>
         <label className="affix">To
-          <input className="input input-date" type="date" value={form.toDate} min={form.fromDate} max={today}
-            onChange={(e) => set({ toDate: e.target.value, range: 'custom' })} />
+          <DatePicker label="To" value={form.toDate} min={form.fromDate} max={today} onChange={(v) => set({ toDate: v, range: 'custom' })} />
         </label>
         <button type="button" className={`strategy-pill${editing ? ' on' : ''}`} onClick={() => setEditing(!editing)} aria-expanded={editing}
           title={settingsLabel(form.config)}>

@@ -24,6 +24,12 @@ The web app's screens are Journal (`/`), Research (`/research`), Live (`/live`) 
 page (`/runs/:id/symbols/:symbol`), from `docs/design/reference/v2/`; `docs/decisions.md` D14–D21
 says how they map onto the unchanged API (Journal runs are ordinary runs named `Journal · <id>`).
 
+The web app is plain CSS on design tokens (`web/src/styles/tokens.css`), plus shadcn/ui components in
+`web/src/components/ui` (add more with `npx shadcn@latest add <name>` from `web/`). Tailwind serves only
+those: `web/src/styles/shadcn.css` skips Tailwind's preflight (it would restyle every screen), scans
+only the shadcn files for classes, and maps shadcn's colours onto our tokens in `@theme` (our
+`--accent` / `--muted` mean something else, so shadcn's `:root` variables are never defined).
+
 `runAll.js` and `summary.js` demand an explicit count (`5`, `all`) and take an optional list name
 from `lists/`. There is no bare invocation, because `fno.txt` is 207 symbols — about 1,400 API
 calls (~30 minutes at 50/min) for a year of 1-minute data.
