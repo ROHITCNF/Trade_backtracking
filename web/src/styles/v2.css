@@ -227,6 +227,7 @@ button.heat-add { font: inherit; width: 100%; background: none; color: var(--acc
 .caption-md { margin: 0; font-size: 13.5px; color: var(--ink-3); }
 
 .live-split { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(0, 2.4fr); gap: var(--s-4); align-items: start; }
+.live-split-wide { grid-template-columns: minmax(0, 1fr); }
 .live-list { padding: 0; overflow: hidden; }
 .live-list-head { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3); border-bottom: 1px solid var(--line); }
 .live-sort { width: auto; padding: 0 8px; gap: 4px; font-size: 14px; }

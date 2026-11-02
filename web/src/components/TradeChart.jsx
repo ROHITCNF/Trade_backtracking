@@ -108,8 +108,9 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360, marks
   const c = useThemeColors();
 
   useEffect(() => {
+    // autoSize follows the container, so a new `height` resizes the chart
+    // without rebuilding it (and without losing the user's zoom).
     const chart = createChart(ref.current, {
-      height,
       autoSize: true,
       layout: { background: { color: c.surface }, textColor: c.ink3, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11, attributionLogo: false },
       grid: { vertLines: { color: c.line }, horzLines: { color: c.line } },
@@ -166,7 +167,7 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360, marks
     if (visible) chart.timeScale().setVisibleRange({ from: visible.from + IST, to: visible.to + IST });
     else chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [candles, trade, orbEnd, height, c, marks, visible, bandFull, lineTitles]);
+  }, [candles, trade, orbEnd, c, marks, visible, bandFull, lineTitles]);
 
   return <div ref={ref} style={{ width: '100%', height }} />;
 }
