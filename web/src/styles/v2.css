@@ -8,6 +8,9 @@
 .research-bar { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); }
 .research-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
 .research-row select.input { min-width: 130px; }
+/* shadcn fields beside a caption (.affix): the caption colour would otherwise carry into the value. */
+.research-row [data-slot=select-trigger] { min-width: 130px; }
+.affix [data-slot=select-trigger], .affix .date-trigger { color: var(--ink); background: var(--surface); }
 .research-row .search { width: 320px; }
 .research-estimate { font-size: 12.5px; text-align: right; }
 .strategy-pill {
