@@ -250,7 +250,7 @@ button.live-row:hover { background: var(--surface-2); }
 .side-short { background: var(--loss-soft); color: var(--loss); }
 .side-tag { font-size: 13px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-control); }
 
-.live-trade { display: flex; flex-direction: column; gap: var(--s-4); min-width: 0; }
+.live-trade { display: flex; flex-direction: column; gap: var(--s-4); min-width: 0; scroll-margin-top: 76px; } /* below the sticky header */
 .live-trade-empty { min-height: 200px; justify-content: center; align-items: center; }
 .live-trade-head { display: flex; align-items: flex-start; gap: var(--s-3); flex-wrap: wrap; }
 .live-trade-title { gap: var(--s-2); align-items: baseline; flex-wrap: wrap; }
@@ -259,6 +259,11 @@ button.live-row:hover { background: var(--surface-2); }
 .live-chart { position: relative; border: 1px solid var(--line); border-radius: var(--r-input); overflow: hidden; }
 .live-orb-label { position: absolute; z-index: 3; top: 8px; left: 10px; padding: 2px 8px; border-radius: 4px; background: var(--surface); color: var(--accent); font-size: 12.5px; pointer-events: none; }
 .live-chart-state { min-height: 240px; }
+.replay-bar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; padding: var(--s-2) var(--s-3); border: 1px solid var(--line); border-radius: var(--r-input); background: var(--surface-2); margin-top: calc(-1 * var(--s-2)); }
+.replay-buttons { gap: var(--s-1); }
+.replay-buttons .icon-btn { width: 34px; height: 34px; }
+.replay-slider { flex: 1 1 160px; min-width: 120px; accent-color: var(--accent); }
+.replay-readout { display: inline-flex; align-items: baseline; gap: var(--s-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .live-legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: 13px; color: var(--ink-2); }
 .live-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .live-legend i { display: inline-block; width: 12px; height: 12px; }

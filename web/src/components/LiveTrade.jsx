@@ -7,7 +7,11 @@
 import { connectFyers } from '../lib/me.jsx';
 import { dateLong, pnl, price, qty, rMultiple, tone } from '../lib/format.js';
 import { REASON, checkText, held, rOf, short, tickText, tradeStory, tsOn } from '../lib/liveView.js';
+import { useMemo, useRef } from 'react';
+import { replayFrame } from '../lib/replay.js';
 import TradeChart from './TradeChart.jsx';
+import Icon from './Icon.jsx';
+import { ReplayBar, useReplay } from './Replay.jsx';
 import Segmented from './Segmented.jsx';
 
 const WINDOWS = [['trade', 'Trade window'], ['full', 'Full day']];
@@ -54,6 +58,48 @@ function ChartState({ chart }) {
 export default function LiveTrade({ row, chart, window: win, onWindow, nav, narrow, wide = false }) {
   const t = row.trade;
   const m = row.mismatch;
+  const data = chart?.data;
+  const shown = t && data?.trade;
+  const story = shown ? tradeStory(shown, data.candles, data.orbEnd) : null;
+  const ex = story?.excursions;
+  const bt = m?.backtest;
+  // Memoised so replay steps (which re-render this panel) don't rebuild the chart.
+  const marks = useMemo(() => {
+    if (!shown) return null;
+    const btMark = bt?.entry != null && bt.entryTime && /^entry|^side/.test(m.problem) ? { time: tsOn(shown, bt.entryTime), price: bt.entry, shape: 'dashed-ring', color: 'muted' } : null;
+    // Drawn in order, so the backtest's ring sits under live's entry.
+    return [
+      btMark && btMark.time != null && btMark,
+      { time: shown.entryTs, price: shown.entry, shape: 'ring', color: 'accent' },
+      shown.exitTs != null && { time: shown.exitTs, price: shown.exit, shape: 'square', color: 'ink' },
+      ex && { time: ex.best.ts, price: ex.best.price, shape: 'diamond', color: 'profit' },
+      ex && { time: ex.worst.ts, price: ex.worst.price, shape: 'diamond', color: 'loss' },
+    ].filter(Boolean);
+  }, [data, m]); // eslint-disable-line react-hooks/exhaustive-deps
+  const visible = useMemo(() => {
+    const last = data?.candles.at(-1)?.[0];
+    return shown && win === 'trade' && last
+      ? { from: Math.max(data.candles[0][0], shown.entryTs - 25 * 60), to: Math.min(last, (shown.exitTs ?? last) + 10 * 60) }
+      : null;
+  }, [data, win]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Bar replay (desktop, closed trades): the panel is keyed by trade, so
+  // moving to another trade remounts it and replay stops.
+  const canReplay = !narrow && Boolean(shown) && t.status === 'closed' && data.candles.length > 0;
+  const replay = useReplay(data?.candles.length ?? 0);
+  const card = useRef(null);
+  // The enlarged chart is most of the window: bring the panel (and with it
+  // the replay bar under the chart) into view.
+  const startReplay = () => {
+    replay.start();
+    card.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+  const replaying = canReplay && replay.on;
+  const frame = useMemo(
+    () => (replaying ? replayFrame({ candles: data.candles, trade: shown, orbEnd: data.orbEnd, marks, cursor: replay.cursor }) : null),
+    [replaying, data, marks, replay.cursor] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   const head = (
     <div className="live-trade-head">
       <div className="spacer">
@@ -72,7 +118,10 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
         </div>
         <p className="caption-md">{dateLong(row.date)}{t ? ' · 1-minute · IST' : ' · backtest only'}</p>
       </div>
-      {!narrow && t && <Segmented label="Chart window" value={win} options={WINDOWS} onChange={onWindow} />}
+      {canReplay && !replaying && (
+        <button className="btn" onClick={startReplay} title="Replay the day candle by candle from 09:15"><Icon name="play" /> Replay</button>
+      )}
+      {!narrow && t && !replaying && <Segmented label="Chart window" value={win} options={WINDOWS} onChange={onWindow} />}
       {!narrow && nav}
     </div>
   );
@@ -93,36 +142,21 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
     );
   }
 
-  const data = chart?.data;
-  const shown = data?.trade;
-  const story = shown ? tradeStory(shown, data.candles, data.orbEnd) : null;
-  const ex = story?.excursions;
-  const bt = m?.backtest;
-  const btMark = shown && bt?.entry != null && bt.entryTime && /^entry|^side/.test(m.problem) ? { time: tsOn(shown, bt.entryTime), price: bt.entry, shape: 'dashed-ring', color: 'muted' } : null;
-  // Drawn in order, so the backtest's ring sits under live's entry.
-  const marks = shown && [
-    btMark && btMark.time != null && btMark,
-    { time: shown.entryTs, price: shown.entry, shape: 'ring', color: 'accent' },
-    shown.exitTs != null && { time: shown.exitTs, price: shown.exit, shape: 'square', color: 'ink' },
-    ex && { time: ex.best.ts, price: ex.best.price, shape: 'diamond', color: 'profit' },
-    ex && { time: ex.worst.ts, price: ex.worst.price, shape: 'diamond', color: 'loss' },
-  ].filter(Boolean);
-  const last = data?.candles.at(-1)?.[0];
-  const visible = shown && win === 'trade' && last
-    ? { from: Math.max(data.candles[0][0], shown.entryTs - 25 * 60), to: Math.min(last, (shown.exitTs ?? last) + 10 * 60) }
-    : null;
-
   return (
-    <div className="card live-trade">
+    <div className="card live-trade" ref={card}>
       {head}
       {shown ? (
         <>
           <div className="live-chart">
-            {shown.orbHigh != null && <span className="live-orb-label">Opening range {price(shown.orbLow)} – {price(shown.orbHigh)}</span>}
+            {/* In replay the range is only what has formed so far. */}
+            {(frame ? frame.orb : shown.orbHigh != null && { low: shown.orbLow, high: shown.orbHigh }) && (
+              <span className="live-orb-label">Opening range {price(frame ? frame.orb.low : shown.orbLow)} – {price(frame ? frame.orb.high : shown.orbHigh)}</span>
+            )}
             <TradeChart candles={data.candles} trade={shown} orbEnd={data.orbEnd} height={narrow ? 340 : wide ? 'max(440px, 75vh)' : 440}
-              marks={marks} visible={visible} bandFull lineTitles={false} />
+              marks={marks} visible={visible} bandFull lineTitles={false} replay={frame} />
           </div>
-          <Legend backtest={Boolean(btMark)} />
+          {frame && <ReplayBar replay={replay} frame={frame} />}
+          <Legend backtest={Boolean(marks?.some((k) => k.shape === 'dashed-ring'))} />
         </>
       ) : (
         <ChartState chart={chart} />
