@@ -17,6 +17,7 @@ import { useNarrow } from '../lib/useMedia.js';
 import { Stat } from '../components/Stat.jsx';
 import Segmented from '../components/Segmented.jsx';
 import DatePicker from '../components/DatePicker.jsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '../components/Icon.jsx';
 import LiveList from '../components/LiveList.jsx';
 import LiveTrade from '../components/LiveTrade.jsx';
@@ -288,11 +289,17 @@ export default function Live() {
             <DatePicker label="Date" value={date} max={today} onChange={(v) => { setDate(v); setPicked(true); }} />
           </label>
         )}
-        <label className="affix">List
-          <select className="input" value={listId ?? ''} onChange={(e) => { setListId(Number(e.target.value)); setSelected(null); }}>
-            {lists.map((w) => <option key={w.id} value={w.id}>{w.name} · {qty(w.count)}</option>)}
-          </select>
-        </label>
+        {/* Not a <label>: Radix opens the Select on pointer down, which a label's click doesn't send. */}
+        <div className="affix">List
+          <Select value={listId != null ? String(listId) : undefined} onValueChange={(v) => { setListId(Number(v)); setSelected(null); }}>
+            <SelectTrigger size="sm" aria-label="List">
+              <SelectValue placeholder="Pick a list" />
+            </SelectTrigger>
+            <SelectContent position="popper" align="start">
+              {lists.map((w) => <SelectItem key={w.id} value={String(w.id)}>{w.name} · {qty(w.count)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Notice notice={liveNotice(status)} />
