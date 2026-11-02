@@ -12,6 +12,11 @@ const PATHS = {
   moon: <path d="M16 12.5A6.5 6.5 0 017.5 4a6.5 6.5 0 108.5 8.5z" />,
   expand: <path d="M12 3.5h4.5V8M8 16.5H3.5V12M16.5 3.5L11.5 8.5M3.5 16.5l5-5" />,
   collapse: <path d="M11.5 3.5v5h5M8.5 16.5v-5h-5M11.5 8.5l5-5M8.5 11.5l-5 5" />,
+  play: <path d="M6.5 4.5l9 5.5-9 5.5z" />,
+  pause: <path d="M7 4.5v11M13 4.5v11" />,
+  restart: <><path d="M5 4.5v11" /><path d="M15 4.5L8 10l7 5.5z" /></>,
+  stepBack: <><path d="M14.5 4.5v11" /><path d="M11 5.5L6 10l5 4.5" /></>,
+  stepFwd: <><path d="M5.5 4.5v11" /><path d="M9 5.5l5 4.5-5 4.5" /></>,
   upload: <><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5" /><path d="M4 13v3h12v-3" /></>,
 };
 
