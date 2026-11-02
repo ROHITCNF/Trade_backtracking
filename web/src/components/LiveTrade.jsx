@@ -50,7 +50,8 @@ function ChartState({ chart }) {
   return null;
 }
 
-export default function LiveTrade({ row, chart, window: win, onWindow, nav, narrow }) {
+// `wide` (desktop only): the list is hidden and the chart takes most of the window.
+export default function LiveTrade({ row, chart, window: win, onWindow, nav, narrow, wide = false }) {
   const t = row.trade;
   const m = row.mismatch;
   const head = (
@@ -118,7 +119,7 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
         <>
           <div className="live-chart">
             {shown.orbHigh != null && <span className="live-orb-label">Opening range {price(shown.orbLow)} – {price(shown.orbHigh)}</span>}
-            <TradeChart candles={data.candles} trade={shown} orbEnd={data.orbEnd} height={narrow ? 340 : 440}
+            <TradeChart candles={data.candles} trade={shown} orbEnd={data.orbEnd} height={narrow ? 340 : wide ? 'max(440px, 75vh)' : 440}
               marks={marks} visible={visible} bandFull lineTitles={false} />
           </div>
           <Legend backtest={Boolean(btMark)} />

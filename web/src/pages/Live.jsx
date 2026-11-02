@@ -52,6 +52,15 @@ function CheckStat({ counts, checkedDays, onShow }) {
   );
 }
 
+// The enlarged chart is a per-browser preference, like the theme.
+const EXPAND_KEY = 'orb.liveChartExpanded';
+function readExpanded() {
+  try { return localStorage.getItem(EXPAND_KEY) === '1'; } catch { return false; }
+}
+function saveExpanded(on) {
+  try { localStorage.setItem(EXPAND_KEY, on ? '1' : '0'); } catch {}
+}
+
 export default function Live() {
   const narrow = useNarrow();
   const [status, setStatus] = useState(null);
@@ -69,6 +78,7 @@ export default function Live() {
   const [selected, setSelected] = useState(null);
   const [open, setOpen] = useState(false); // phone: showing one trade instead of the list
   const [win, setWin] = useState('trade');
+  const [expanded, setExpanded] = useState(readExpanded); // desktop: chart enlarged, list hidden
   const [charts, setCharts] = useState({});
   const [rechecking, setRechecking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -203,10 +213,18 @@ export default function Live() {
     <div className="row live-nav">
       <button className="btn icon-btn" aria-label="Previous trade" disabled={at <= 0} onClick={() => step(-1)}>‹</button>
       <button className="btn icon-btn" aria-label="Next trade" disabled={at < 0 || at >= clickable.length - 1} onClick={() => step(1)}>›</button>
+      {!narrow && (
+        <button className="btn icon-btn" aria-pressed={expanded} aria-label={expanded ? 'Shrink chart' : 'Enlarge chart'}
+          title={expanded ? 'Shrink chart, show the trade list' : 'Enlarge chart, hide the trade list'}
+          onClick={() => { setExpanded(!expanded); saveExpanded(!expanded); }}>
+          <Icon name={expanded ? 'collapse' : 'expand'} />
+        </button>
+      )}
     </div>
   );
+  const wide = expanded && !narrow && Boolean(current);
   const panel = current && (
-    <LiveTrade key={current.key} row={current} chart={charts[current.key]} window={win} onWindow={setWin} nav={nav} narrow={narrow} />
+    <LiveTrade key={current.key} row={current} chart={charts[current.key]} window={win} onWindow={setWin} nav={nav} narrow={narrow} wide={wide} />
   );
 
   // Phone, one trade open: its own screen with Previous / Next at the bottom.
@@ -290,9 +308,9 @@ export default function Live() {
         <CheckStat counts={counts} checkedDays={data.reconciliations.length} onShow={() => { setTab('review'); setSelected(null); }} />
       </div>
 
-      <div className="live-split">
-        <LiveList rows={visibleRows} tabs={tabs} tab={shownTab} onTab={(v) => { setTab(v); setSelected(null); }}
-          sortBy={sortBy} onSort={setSortBy} selected={narrow ? null : current?.key} onSelect={select} footer={footer} />
+      <div className={`live-split${wide ? ' live-split-wide' : ''}`}>
+        {!wide && <LiveList rows={visibleRows} tabs={tabs} tab={shownTab} onTab={(v) => { setTab(v); setSelected(null); }}
+          sortBy={sortBy} onSort={setSortBy} selected={narrow ? null : current?.key} onSelect={select} footer={footer} />}
         {!narrow && (panel || <div className="card live-trade live-trade-empty"><p className="caption">No trades {oneDay ? `on ${dateLong(from)}` : 'in this range'}. {from === today ? 'Refresh to see new breakouts.' : ''}</p></div>)}
       </div>
     </div>
