@@ -5,14 +5,17 @@
 // The page opens on the last trading day and never moves on its own: Refresh
 // picks up new trades. Opening a trade loads its day's candles from Fyers
 // (one call, kept for the visit so paging back costs nothing).
+// Fixed / Trail (D25) picks which paper flow the whole page shows; it lives
+// in the URL (?flow=trail). The trail flow isn't reconciled.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { connectFyers } from '../lib/me.jsx';
 import { istToday } from '../lib/dates.js';
 import { dateLong, dateShort, pnl, qty, rate, tone } from '../lib/format.js';
 import { RANGES, dailyRows, defaultWatchlist, liveNotice, liveRange, sessionHeader } from '../lib/live.js';
-import { buildRows, reviewCounts, sortRows, tabRows } from '../lib/liveView.js';
+import { FLOWS, buildRows, parseFlow, reviewCounts, rowKey, sortRows, tabRows } from '../lib/liveView.js';
 import { useNarrow } from '../lib/useMedia.js';
 import { Stat } from '../components/Stat.jsx';
 import Segmented from '../components/Segmented.jsx';
@@ -65,6 +68,9 @@ function saveExpanded(on) {
 
 export default function Live() {
   const narrow = useNarrow();
+  const [params, setParams] = useSearchParams();
+  const flow = parseFlow(params.get('flow'));
+  const otherFlow = flow === 'trail' ? 'fixed' : 'trail';
   const [status, setStatus] = useState(null);
   const [lists, setLists] = useState(null);
   const [listId, setListId] = useState(null);
@@ -82,6 +88,8 @@ export default function Live() {
   const [win, setWin] = useState('trade');
   const [expanded, setExpanded] = useState(readExpanded); // desktop: chart enlarged, list hidden
   const [charts, setCharts] = useState({});
+  const [others, setOthers] = useState(null); // the other flow's trades, by date|symbol
+  const [decisions, setDecisions] = useState({}); // date -> that day's decision log (trail stop moves)
   const [rechecking, setRechecking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tick, setTick] = useState(0); // bumped by Refresh to re-read trades
@@ -107,16 +115,26 @@ export default function Live() {
   const loadTrades = useCallback(async () => {
     if (!from || !to) return;
     const id = ++latest.current;
-    const q = new URLSearchParams({ from, to, ...(listId && { watchlist: String(listId) }) });
+    const q = (f) => new URLSearchParams({ from, to, flow: f, ...(listId && { watchlist: String(listId) }) });
     try {
-      const d = await api(`/api/paper-trades?${q}`);
+      const d = await api(`/api/paper-trades?${q(flow)}`);
       if (id !== latest.current) return;
       setData(d);
       setError(null);
     } catch (err) {
       if (id === latest.current) setError(err.message);
+      return;
     }
-  }, [from, to, listId, tick]);
+    // The same entries in the other flow, for "Same entry, Fixed: …". Not
+    // worth an error banner if it fails: the panel just doesn't say.
+    setOthers(null);
+    try {
+      const o = await api(`/api/paper-trades?${q(otherFlow)}`);
+      if (id === latest.current) setOthers(new Map(o.trades.map((t) => [rowKey(t.date, t.symbol), t])));
+    } catch {
+      // leave it unknown
+    }
+  }, [from, to, listId, tick, flow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadStatus().catch((err) => setError(err.message));
@@ -140,13 +158,17 @@ export default function Live() {
   }, [listId]);
 
   const rows = useMemo(
-    () => (data ? buildRows({ trades: data.trades, reconciliations: data.reconciliations, symbols, missing: data.coverage?.missing, oneDay, date: from }) : []),
+    () => (data ? buildRows({ trades: data.trades, reconciliations: data.reconciliations, symbols, missing: data.coverage?.missing, oneDay, date: from, flow: data.flow }) : []),
     [data, symbols, oneDay, from]
   );
+  // Everything below follows the flow of the trades on screen, so a toggle
+  // never pairs one flow's rows with the other's candles while it loads.
+  const shownFlow = data?.flow ?? flow;
+  const trail = shownFlow === 'trail';
   const tabs = [
     ['traded', 'Traded', tabRows(rows, 'traded').length],
     ...(oneDay ? [['all', 'All', rows.length]] : []),
-    ['review', 'Review', tabRows(rows, 'review').length],
+    ...(trail ? [] : [['review', 'Review', tabRows(rows, 'review').length]]),
   ];
   const shownTab = tabs.some(([v]) => v === tab) ? tab : 'traded';
   const visibleRows = useMemo(() => sortRows(tabRows(rows, shownTab), sortBy), [rows, shownTab, sortBy]);
@@ -155,23 +177,46 @@ export default function Live() {
   const at = current ? clickable.indexOf(current) : -1;
 
   // One Fyers call per paper trade opened, kept for the visit.
+  const chartKey = current ? `${shownFlow}|${current.key}` : null;
   useEffect(() => {
     const t = current?.trade;
-    if (!t || charts[current.key] || loading.current.has(current.key)) return;
-    const key = current.key;
+    if (!t || charts[chartKey] || loading.current.has(chartKey)) return;
+    const key = chartKey;
     loading.current.add(key);
     setCharts((c) => ({ ...c, [key]: { loading: true } }));
-    api(`/api/paper-trades/${t.date}/${encodeURIComponent(t.symbol)}/candles`).then(
+    api(`/api/paper-trades/${t.date}/${encodeURIComponent(t.symbol)}/candles?flow=${shownFlow}`).then(
       (d) => setCharts((c) => ({ ...c, [key]: { data: d } })),
       (err) => setCharts((c) => ({ ...c, [key]: { error: err } }))
     ).finally(() => loading.current.delete(key));
-  }, [current, charts]);
+  }, [current, charts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A trail trade's stop moves are in its day's decision log: one call a day.
+  const tradeDate = trail ? current?.trade?.date : null;
+  useEffect(() => {
+    if (!tradeDate || decisions[tradeDate]) return;
+    setDecisions((d) => ({ ...d, [tradeDate]: { loading: true } }));
+    api(`/api/paper-trades/${tradeDate}/decisions`).then(
+      (d) => setDecisions((all) => ({ ...all, [tradeDate]: { list: d.decisions } })),
+      () => setDecisions((all) => ({ ...all, [tradeDate]: { list: [] } }))
+    );
+  }, [tradeDate, decisions]);
+
+  const pickFlow = (f) => {
+    setParams((p) => {
+      const next = new URLSearchParams(p);
+      if (f === 'fixed') next.delete('flow');
+      else next.set('flow', f);
+      return next;
+    }, { replace: true });
+    setSelected(null);
+  };
 
   async function refresh() {
     setRefreshing(true);
     try {
       await loadStatus();
-      setCharts((c) => Object.fromEntries(Object.entries(c).filter(([k]) => !k.startsWith(`${today}|`)))); // today's candles move
+      setCharts((c) => Object.fromEntries(Object.entries(c).filter(([k]) => k.split('|')[1] !== today))); // today's candles move
+      setDecisions(({ [today]: _, ...rest }) => rest);
       setTick((n) => n + 1);
     } catch (err) {
       setError(err.message);
@@ -226,7 +271,8 @@ export default function Live() {
   );
   const wide = expanded && !narrow && Boolean(current);
   const panel = current && (
-    <LiveTrade key={current.key} row={current} chart={charts[current.key]} window={win} onWindow={setWin} nav={nav} narrow={narrow} wide={wide} />
+    <LiveTrade key={chartKey} row={current} chart={charts[chartKey]} window={win} onWindow={setWin} nav={nav} narrow={narrow} wide={wide}
+      flow={shownFlow} other={others ? others.get(current.key) ?? null : undefined} decisions={decisions[current.trade?.date]?.list} />
   );
 
   // Phone, one trade open: its own screen with Previous / Next at the bottom.
@@ -252,7 +298,7 @@ export default function Live() {
       {shownTab === 'all' && data.coverage?.missing.length > 0 && (
         <p className="caption live-foot">{qty(data.coverage.missing.length)} of {qty(data.coverage.symbols)} symbols in “{data.coverage.watchlist.name}” aren’t traded live.</p>
       )}
-      {shownTab === 'review' && oneDay && afterClose && (
+      {!trail && shownTab === 'review' && oneDay && afterClose && (
         <div className="live-foot">
           <button className="link-btn accent" disabled={rechecking} onClick={recheck}>{rechecking ? 'Checking…' : 'Re-check day against the backtest'}</button>
         </div>
@@ -270,6 +316,7 @@ export default function Live() {
           </div>
           <p className="page-sub">{head.line}</p>
         </div>
+        <Segmented label="Flow" value={flow} options={FLOWS} onChange={pickFlow} />
         <button className="btn" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
       </div>
 
@@ -310,7 +357,9 @@ export default function Live() {
         <Stat label="Trades" value={qty(summary.trades)} sub={`${qty(summary.open)} open`} />
         <Stat label="Win rate" value={summary.winRate === null ? '—' : rate(summary.winRate)} sub={`${qty(summary.wins)} W · ${qty(summary.losses)} L`} />
         <Stat label="Days traded" value={qty(days.length)} sub={oneDay ? 'single day' : span} />
-        <CheckStat counts={counts} checkedDays={data.reconciliations.length} onShow={() => { setTab('review'); setSelected(null); }} />
+        {trail
+          ? <Stat label="Checked against backtest" value="Live only" sub="the trail flow isn’t reconciled" />
+          : <CheckStat counts={counts} checkedDays={data.reconciliations.length} onShow={() => { setTab('review'); setSelected(null); }} />}
       </div>
 
       <div className={`live-split${wide ? ' live-split-wide' : ''}`}>

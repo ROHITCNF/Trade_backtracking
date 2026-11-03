@@ -92,3 +92,77 @@ test('tick-order notes are expected: tagged, counted apart, never under Review',
   assert.deepEqual(reviewCounts(rows), { review: 0, missed: 0, differ: 0, tick: 1 });
   assert.equal(tickText(note), 'Tick order (expected): one candle touched both stop and target; the backtest assumes the stop, live saw which came first. The backtest exited on Stop for −₹10.');
 });
+
+// D25: the trail flow.
+import { otherFlowText, parseFlow, slSteps, startSl } from '../src/lib/liveView.js';
+
+const trailTrade = (over = {}) => ({
+  ...trade('NSE:A-EQ', { flow: 'trail', target: null, initialSl: 99, sl: 100, exitTime: '10:10', exit: 100, reason: 'SL', pnl: 0 }),
+  entryTs: 1000, exitTs: 1000 + 30 * 60, ...over,
+});
+const trailEv = (time, sl, over = {}) => ({ kind: 'TRAIL', symbol: 'NSE:A-EQ', payload: { kind: 'TRAIL', flow: 'trail', sl, best: 0, time }, ...over });
+
+test('slSteps: starting stop, each TRAIL from its minute, held to the exit (long)', () => {
+  const steps = slSteps(trailTrade(), [
+    trailEv('09:45', 99.5),
+    { kind: 'ENTRY', symbol: 'NSE:A-EQ', payload: { flow: 'trail' } },
+    trailEv('09:50', 100),
+    trailEv('09:52', 1, { symbol: 'NSE:B-EQ' }), // another symbol
+    { kind: 'TRAIL', symbol: 'NSE:A-EQ', payload: { flow: 'fixed', sl: 5, time: '09:55' } }, // not the trail flow
+  ]);
+  assert.deepEqual(steps, [
+    { time: 1000, value: 99 },
+    { time: 1000 + 5 * 60, value: 99.5 },
+    { time: 1000 + 10 * 60, value: 100 },
+    { time: 1000 + 30 * 60, value: 100 },
+  ]);
+});
+
+test('slSteps: short steps down; two moves in one minute keep the last; open runs to the last candle', () => {
+  const short = trailTrade({ side: 'short', initialSl: 101, sl: 100, status: 'open', exitTs: null, exitTime: null });
+  assert.deepEqual(slSteps(short, [trailEv('09:45', 100.5), trailEv('09:45', 100)], 1000 + 60 * 60), [
+    { time: 1000, value: 101 },
+    { time: 1000 + 5 * 60, value: 100 },
+    { time: 1000 + 60 * 60, value: 100 },
+  ]);
+});
+
+test('slSteps: no TRAIL is a flat line; a fixed trade has none', () => {
+  assert.deepEqual(slSteps(trailTrade({ sl: 99 }), []), [{ time: 1000, value: 99 }, { time: 2800, value: 99 }]);
+  assert.deepEqual(slSteps(trailTrade({ sl: 99 }), undefined), [{ time: 1000, value: 99 }, { time: 2800, value: 99 }]);
+  assert.equal(slSteps({ ...trailTrade(), flow: 'fixed' }, [trailEv('09:45', 99.5)]), null);
+});
+
+test('trail R and story use the starting stop; the other flow reads as one line', () => {
+  const t = trailTrade({ pnl: 10, exit: 101, sl: 100.5, slTime: '10:05' });
+  assert.equal(startSl(t), 99);
+  assert.equal(rOf(t), 1); // 10 / ((100 - 99) * 10), not against the stepped stop
+  const texts = tradeStory({ ...t, orbHigh: null }, [], '09:30').events.map((e) => e.text);
+  assert.match(texts[0], /SL ₹?99\.00/);
+  assert.ok(texts.some((x) => /Stop trailed from .*99\.00 to .*100\.50/.test(x)));
+  assert.match(texts.at(-1), /^Trailing stop hit/);
+
+  // The stop's last move (09:50) comes before a later best move: time order.
+  const t2 = { ...t, entryTime: '09:40', slTime: '09:50', exitTime: '10:20', entryTs: base + 25 * 60, exitTs: base + 65 * 60 };
+  const bars = [bar(25, 100, 100.2, 99.8, 100), bar(55, 100, 102, 100, 101.5)]; // best at 10:10
+  const story2 = tradeStory({ ...t2, orbHigh: null }, bars, '09:30').events;
+  assert.deepEqual(story2.map((e) => e.time), ['09:40', '09:50', '10:10', '10:20']);
+  assert.match(story2[1].text, /^Stop trailed/);
+
+  assert.match(otherFlowText('trail', trade('NSE:A-EQ')), /^Fixed: .*15.* · Target$/);
+  assert.equal(otherFlowText('fixed', null), 'Trail: —');
+  assert.equal(otherFlowText('fixed', trade('NSE:A-EQ', { status: 'open' })), 'Trail: open');
+  assert.equal(parseFlow('trail'), 'trail');
+  assert.equal(parseFlow('nope'), 'fixed');
+  assert.equal(parseFlow(null), 'fixed');
+});
+
+test('trail rows: no backtest check, marked live only, no review rows', () => {
+  const recon = [{ date: D, mismatches: [{ symbol: 'NSE:A-EQ', problem: 'entry price differs', live: {}, backtest: {} }], notes: [] }];
+  const rows = buildRows({ trades: [trailTrade()], reconciliations: recon, symbols: ['NSE:A-EQ', 'NSE:N-EQ'], oneDay: true, date: D, flow: 'trail' });
+  assert.deepEqual(rows.map((r) => [r.symbol, r.kind, r.liveOnly ?? null, r.tag ?? r.note ?? null]), [
+    ['NSE:A-EQ', 'traded', true, null],
+    ['NSE:N-EQ', 'none', null, 'No breakout'],
+  ]);
+  assert.equal(tabRows(rows, 'review').length, 0);
+});

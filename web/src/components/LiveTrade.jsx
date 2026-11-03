@@ -6,7 +6,7 @@
 
 import { connectFyers } from '../lib/me.jsx';
 import { dateLong, pnl, price, qty, rMultiple, tone } from '../lib/format.js';
-import { REASON, checkText, held, rOf, short, tickText, tradeStory, tsOn } from '../lib/liveView.js';
+import { REASON, checkText, held, otherFlowText, rOf, short, slSteps, startSl, tickText, tradeStory, tsOn } from '../lib/liveView.js';
 import { useMemo, useRef } from 'react';
 import { replayFrame } from '../lib/replay.js';
 import TradeChart from './TradeChart.jsx';
@@ -55,8 +55,12 @@ function ChartState({ chart }) {
 }
 
 // `wide` (desktop only): the list is hidden and the chart takes most of the window.
-export default function LiveTrade({ row, chart, window: win, onWindow, nav, narrow, wide = false }) {
+// `flow` is the page's paper flow (D25); `other` is the same entry's trade in
+// the other flow (undefined while loading), and `decisions` the day's
+// decision log, which holds a trail trade's stop moves.
+export default function LiveTrade({ row, chart, window: win, onWindow, nav, narrow, wide = false, flow = 'fixed', other, decisions }) {
   const t = row.trade;
+  const trail = flow === 'trail';
   const m = row.mismatch;
   const data = chart?.data;
   const shown = t && data?.trade;
@@ -85,7 +89,12 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
 
   // Bar replay (desktop, closed trades): the panel is keyed by trade, so
   // moving to another trade remounts it and replay stops.
-  const canReplay = !narrow && Boolean(shown) && t.status === 'closed' && data.candles.length > 0;
+  // Replay draws the stop as one flat line, so it isn't offered for a trail trade.
+  const canReplay = !narrow && !trail && Boolean(shown) && t.status === 'closed' && data.candles.length > 0;
+  const steps = useMemo(
+    () => (trail && shown ? slSteps(shown, decisions, data.candles.at(-1)?.[0] ?? null) : null),
+    [trail, data, decisions] // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const replay = useReplay(data?.candles.length ?? 0);
   const card = useRef(null);
   // The enlarged chart is most of the window: bring the panel (and with it
@@ -153,7 +162,7 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
               <span className="live-orb-label">Opening range {price(frame ? frame.orb.low : shown.orbLow)} – {price(frame ? frame.orb.high : shown.orbHigh)}</span>
             )}
             <TradeChart candles={data.candles} trade={shown} orbEnd={data.orbEnd} height={narrow ? 340 : wide ? 'max(440px, 75vh)' : 440}
-              marks={marks} visible={visible} bandFull lineTitles={false} replay={frame} />
+              marks={marks} visible={visible} bandFull lineTitles={false} replay={frame} slSteps={steps} />
           </div>
           {frame && <ReplayBar replay={replay} frame={frame} />}
           <Legend backtest={Boolean(marks?.some((k) => k.shape === 'dashed-ring'))} />
@@ -162,12 +171,14 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
         <ChartState chart={chart} />
       )}
 
+      {trail && <div className="banner banner-info live-check">Not reconciled · live only. The backtest has no trailing stop to check it against (D25).</div>}
       {m && <div className="banner banner-warn live-check">{checkText(m, t)}</div>}
       {!m && row.check?.kind === 'tick' && <div className="banner banner-info live-check">{tickText(row.check)}</div>}
 
       {story && (
         <section className="stack live-story">
           <h3 className="title">What happened</h3>
+          {other !== undefined && <p className="caption-md live-other-flow">Same entry, {otherFlowText(flow, other)}</p>}
           <ol className="timeline">
             {story.events.map((e, i) => (
               <li key={i} className={e.last ? `timeline-last ${e.tone}-soft-bg` : ''}>
@@ -182,8 +193,8 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
 
       <div className="live-grid">
         <Cell label="Entry" value={`${t.entryTime} · ${price(t.entry)}`} />
-        <Cell label="Stop loss" value={price(t.sl)} className="loss" />
-        <Cell label="Target" value={price(t.target)} className="profit" />
+        <Cell label={trail && t.sl !== startSl(t) ? `Stop · from ${price(startSl(t))}` : 'Stop loss'} value={price(t.sl)} className="loss" />
+        <Cell label="Target" value={trail ? 'None · trailing' : price(t.target)} className="profit" />
         <Cell label="Exit" value={t.status === 'open' ? 'Open' : `${t.exitTime} · ${price(t.exit)}`} />
         <Cell label="Qty" value={qty(t.quantity)} />
         <Cell label="P&L" value={pnl(t.pnl)} className={tone(t.pnl)} />
