@@ -4,7 +4,7 @@
 // timestamp is shifted +19800 s to read as IST (as src/template.html does).
 
 import { useEffect, useRef } from 'react';
-import { CandlestickSeries, LineStyle, createChart, createSeriesMarkers } from 'lightweight-charts';
+import { CandlestickSeries, LineSeries, LineStyle, LineType, createChart, createSeriesMarkers } from 'lightweight-charts';
 import { useThemeColors } from '../lib/chartTheme.js';
 import { price } from '../lib/format.js';
 
@@ -107,8 +107,10 @@ const bar = ([t, o, h, l, cl]) => ({ time: t + IST, open: o, high: h, low: l, cl
 // across the chart; `lineTitles` labels the price lines. `replay` (a frame
 // from lib/replay.js) shows only the candles played so far: the chart is
 // built once per replay and each step adds a candle, so playing doesn't
-// rebuild it or lose the user's zoom.
-export default function TradeChart({ candles, trade, orbEnd, height = 360, marks = null, visible = null, bandFull = false, lineTitles = true, replay = null }) {
+// rebuild it or lose the user's zoom. `slSteps` ([{ time, value }], epoch s)
+// draws a trail trade's moving stop as a stepped line instead of a flat one
+// (D25); replay doesn't take it.
+export default function TradeChart({ candles, trade, orbEnd, height = 360, marks = null, visible = null, bandFull = false, lineTitles = true, replay = null, slSteps = null }) {
   const ref = useRef(null);
   const c = useThemeColors();
   const built = useRef(null);
@@ -131,7 +133,8 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360, marks
     });
     // Price lines don't widen the scale on their own; keep these in view.
     // In replay it's only what has happened so far.
-    const state = { chart, levels: [trade.entry, trade.sl, trade.target, trade.orbHigh, trade.orbLow], lines: [], shown: -1 };
+    const steps = replaying ? null : slSteps;
+    const state = { chart, levels: [trade.entry, trade.sl, trade.target, trade.orbHigh, trade.orbLow, ...(steps || []).map((p) => p.value)], lines: [], shown: -1 };
     const series = chart.addSeries(CandlestickSeries, {
       upColor: c.profit, downColor: c.loss, wickUpColor: c.profit, wickDownColor: c.loss, borderVisible: false,
       // With custom marks (Live), the last price would read as a fourth level.
@@ -152,7 +155,7 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360, marks
     state.series = series;
 
     const line = (p, color, title) => p != null && series.createPriceLine({ price: p, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: lineTitles ? title : '' });
-    state.drawLines = () => [line(trade.entry, c.accent, 'Entry'), line(trade.sl, c.loss, 'SL'), line(trade.target, c.profit, 'Target')].filter(Boolean);
+    state.drawLines = () => [line(trade.entry, c.accent, 'Entry'), !steps && line(trade.sl, c.loss, 'SL'), line(trade.target, c.profit, 'Target')].filter(Boolean);
     const markColor = { accent: c.accent, ink: c.ink, profit: c.profit, loss: c.loss, muted: c.muted };
     const toMark = (m) => ({ ...m, time: m.time + IST, color: markColor[m.color] || m.color });
 
@@ -173,6 +176,14 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360, marks
     const data = candles.map(bar);
     series.setData(data);
     state.drawLines();
+    if (steps?.length) {
+      const stop = chart.addSeries(LineSeries, {
+        color: c.loss, lineWidth: 2, lineStyle: LineStyle.Dashed, lineType: LineType.WithSteps,
+        lastValueVisible: true, priceLineVisible: false, crosshairMarkerVisible: false,
+        title: lineTitles ? 'SL' : '',
+      });
+      stop.setData(steps.map((p) => ({ time: p.time + IST, value: p.value })));
+    }
 
     // Band: candles from the first one up to (not including) the ORB end.
     const [h, m] = orbEnd.split(':').map(Number);
@@ -195,7 +206,7 @@ export default function TradeChart({ candles, trade, orbEnd, height = 360, marks
     if (visible) chart.timeScale().setVisibleRange({ from: visible.from + IST, to: visible.to + IST });
     else chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [candles, trade, orbEnd, c, marks, visible, bandFull, lineTitles, replaying]);
+  }, [candles, trade, orbEnd, c, marks, visible, bandFull, lineTitles, replaying, slSteps]);
 
   useEffect(() => {
     if (built.current && replay) applyReplay(built.current, candles, replay);
