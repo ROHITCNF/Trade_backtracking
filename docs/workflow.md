@@ -16,18 +16,10 @@ You write the idea and approve the issue. Claude does the rest. CI decides the m
 /feature "show Avg R on each Journal list card, next to win % and PF"
 ```
 
-Claude reads the code and opens an issue, say #150. The issue has four sections: Why, Acceptance
-criteria ("each card shows `Avg R`, 2 decimals, `—` when there are no trades"), Out of scope and
-Design ref. It gets the label `area:web`.
-You read the issue and either reply "approved" or change it. **This is gate G1, your first decision.**
+Claude opens issue #150 (`area:web`) with Why, Acceptance criteria ("each card shows `Avg R`, 2 decimals,
+`—` with no trades"), Out of scope and Design ref. You approve or edit it. **This is gate G1.**
 
-**2. Ship it.**
-
-```
-/ship #150
-```
-
-From here the loop runs on its own:
+**2. Ship it** with `/ship #150`. From here the loop runs on its own:
 
 | step | what happens for #150 |
 |---|---|
@@ -38,16 +30,15 @@ From here the loop runs on its own:
 | 4 e2e | **e2e-tester** (Haiku) runs Playwright on the stub API in light and dark, then looks at the Journal screenshots |
 | 5 learn | no rule changed, so nothing to record (otherwise `/decision` or CLAUDE.md, committed now) |
 | 6 open PR | **pr-creator** (Haiku) fills the PR template, adds the labels and links "Closes #150" |
-| 7 review | **pr-reviewer** (Sonnet) checks the diff against `.claude/review/web.md` and the acceptance criteria, then posts `VERDICT: APPROVE` (on `REQUEST_CHANGES`, up to 2 fix rounds, then you decide) |
+| 7 review | **pr-reviewer** (Sonnet) checks the diff against `.claude/review/web.md` and the acceptance criteria, then posts `VERDICT: APPROVE` (on `VERDICT: CHANGES`, up to 2 fix rounds, then you decide) |
 | 8 merge | auto-merge is armed, CI passes, and GitHub squash-merges and deletes the branch |
 | 9 report | Claude tells you the PR number, what changed and the screenshots |
 
 **3. Done.** You did two things: wrote one line and approved one issue.
 
-**If it had touched the engine** (say "add a trailing stop"), three things change:
-- the issue gets `area:engine`
-- **test-writer** writes the tests from the acceptance criteria, without seeing the code change
-- the reviewer runs on Opus, and step 8 stops: **you read the PR and merge it yourself. This is gate G2.**
+**An engine feature** (`area:engine`, e.g. a trailing stop) differs in three ways: **test-writer** writes tests
+from the acceptance criteria without seeing the code, the reviewer runs on Opus, and step 8 stops for
+**you to merge (gate G2)**.
 
 ## Pieces
 
@@ -65,20 +56,14 @@ comment with a `VERDICT:` line instead. Agents and skills load at session start.
 ## Guards (they work even if the model slips)
 
 - **CI**: `core tests`, `web tests + build`, `lint` and `e2e` must pass before anything merges to `main`.
-- **Biome** (`npm run lint`):
-  - `src/engine.js` can't import anything impure.
-  - only `src/fyers.js` and `server/feed.js` may import `fyers-api-v3`.
-- **Guard hook** (`.claude/hooks/guard.js`):
-  - blocks commands that use production `DATABASE_URL` or read `.env`
-  - asks before spending Fyers budget
-  - reads the command's text, so PR and issue bodies go in via `-F <file>`
+- **Biome** (`npm run lint`): `src/engine.js` imports nothing impure; only `src/fyers.js` and `server/feed.js` import `fyers-api-v3`.
+- **Guard hook** (`.claude/hooks/guard.js`): blocks production `DATABASE_URL`, reading `.env` and the Neon host;
+  asks before spending Fyers budget. It reads command text, so PR and issue bodies go in via `-F <file>`.
 
 ## Conventions
 
-- **Branch**: `<feat|fix|chore|docs>/<issue>-<slug>` (milestone work: `m<k>/…`).
-- **PR title**: `type(scope): summary`.
-- **Labels**: `area:engine|live|api|db|fyers|web|infra`.
-- Squash-merge only.
+- Branch `<feat|fix|chore|docs>/<issue>-<slug>` (milestone: `m<k>/…`); PR title `type(scope): summary`;
+  labels `area:engine|live|api|db|fyers|web|infra`; squash-merge only.
 - Tests never touch production. DB tests use `TEST_DATABASE_URL`, and E2E makes its own throwaway database.
 
 ## Run E2E or preview the UI locally
