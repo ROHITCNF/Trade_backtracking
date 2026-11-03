@@ -19,7 +19,7 @@ enough that you would be guessing at behaviour.
   If it has none, stop and suggest `/feature`.
 - **Gated** = any label `area:engine`, `area:live` or `area:db`, or the work will touch
   `src/engine.js`, `src/targets.js`, `src/metrics.js`, `server/`, `api/reconcile.js` or
-  `api/db/migrations/`. Decide now, and re-check against the final diff in step 6.
+  `api/db/migrations/`. Decide now, and re-check against the final diff in step 7.
 
 ## 1. Branch
 `m<milestone number>/<issue>-<slug>` if the issue is in a milestone `M<k> · …`, else
@@ -50,36 +50,38 @@ Launch **e2e-tester** with the issue title, its acceptance criteria and
 - Spec changes it made under `web/e2e/` get committed on this branch.
 - Keep its report block for the PR.
 
-## 5. Open the PR
-Launch **pr-creator** with: the issue number, the step 3 counts, the e2e report (or "not run:
-no web/api change"), D-numbers added (`/decision`), docs touched, and what's not done.
-It returns the PR URL. Don't arm auto-merge yet.
-
-## 6. Review
-Run the `/review` skill's procedure: launch **pr-reviewer** with model `opus` if gated, else
-`sonnet`. Prompt: `Review PR #<pr>.` plus the e2e report.
-- `VERDICT: APPROVE`: go to 7.
-- `VERDICT: CHANGES`: fix every **Must fix**, plus any **Should fix** that is cheap and in scope.
-  Rerun 3 (and 4 if UI changed), push, and comment on the PR listing what changed per finding.
-  Then rerun the reviewer.
-- **At most 2 review rounds.** If round 2 still says CHANGES, stop and hand the open findings
-  to the owner.
-
-## 7. Merge
-- **Not gated**: `gh pr merge <pr> --auto --squash --delete-branch`. Branch protection merges it
-  once `core tests`, `web tests + build`, `lint` and `e2e` are green. Watch it with
-  `gh pr checks <pr> --watch`. On a red check, fix it and push (auto-merge stays armed).
-- **Gated (G2)**: don't arm auto-merge. Tell the owner: PR link, review verdict, the one-line
-  risk, and "merge with `gh pr merge <pr> --squash --delete-branch` when you're happy".
-
-## 8. Learn
-Before the PR merges, if this work changed a rule (engine behaviour, a limit, a workflow step,
+## 5. Learn (before the PR opens)
+If this work changed a rule (engine behaviour, a limit, a workflow step,
 a UI convention):
 - record it with `/decision`, and/or
 - update `CLAUDE.md`, `server/architecture.md`, `.claude/skills/engine-rules/SKILL.md` or a
   `.claude/review/*.md` checklist
 
-in the same PR. A lesson that only lives in this conversation is lost.
+commit it on this branch now, so pr-creator lists it and the reviewer sees it. A lesson that only lives in this conversation is lost.
+
+## 6. Open the PR
+Launch **pr-creator** with: the issue number, the step 3 counts, the e2e report (or "not run:
+no web/api change"), the D-numbers and docs from step 5, and what's not done.
+It returns the PR URL. Don't arm auto-merge yet.
+
+## 7. Review
+Run the `/review` skill's procedure: launch **pr-reviewer** with model `opus` if gated, else
+`sonnet`. Prompt: `Review PR #<pr>.` plus the e2e report.
+- `VERDICT: APPROVE`: go to 7.
+- `VERDICT: CHANGES`: fix every **Must fix**, plus any **Should fix** that is cheap and in scope.
+  Rerun 3 (and 4 if the fix touched `web/` or `api/`), push, and comment on the PR listing what changed per finding.
+  Then rerun the reviewer.
+- **At most 2 review rounds.** If round 2 still says CHANGES, stop and hand the open findings
+  to the owner.
+
+## 8. Merge
+- **Not gated**: `gh pr merge <pr> --auto --squash --delete-branch`. Branch protection merges it
+  once `core tests`, `web tests + build`, `lint` and `e2e` are green. Watch it with
+  `gh pr checks <pr> --watch`. On a red check, fix it and push (auto-merge stays armed).
+  If gh refuses `--auto` because the checks are already green ("clean status"), merge directly
+  with `gh pr merge <pr> --squash --delete-branch`.
+- **Gated (G2)**: don't arm auto-merge. Tell the owner: PR link, review verdict, the one-line
+  risk, and "merge with `gh pr merge <pr> --squash --delete-branch` when you're happy".
 
 ## 9. Report
 ```
