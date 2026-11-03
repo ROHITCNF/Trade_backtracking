@@ -124,7 +124,7 @@ test('fixed and trail trades for one symbol and day live side by side (M10)', { 
     assert.deepEqual(rest, { position: 'OPEN' }); // fixed is closed, so no fixed levels
     assert.deepEqual(
       { ...trail, entry: Number(trail.entry), sl: Number(trail.sl), initialSl: Number(trail.initialSl), best: Number(trail.best) },
-      { side: 'long', entry: 102, sl: 102, target: null, quantity: 5, entryTime: '09:31', initialSl: 100.98, best: 103.02 }
+      { side: 'long', entry: 102, sl: 102, target: null, quantity: 5, entryTime: '09:31', initialSl: 100.98, best: 103.02, slTime: '09:50' }
     );
 
     await store.logDecision(DATE, { ...exit(SYM), flow: 'trail', price: 102, reason: 'SL', pnl: 0, time: '10:05' });
@@ -144,4 +144,5 @@ test('a restored open position carries both flows when both are open', { skip: n
     assert.equal(Number(s.target), 103.02);
     assert.equal(s.trail.target, null);
     assert.equal(Number(s.trail.best), 102); // best starts at the entry price
+    assert.equal(s.trail.slTime, null); // still the starting stop
   }));

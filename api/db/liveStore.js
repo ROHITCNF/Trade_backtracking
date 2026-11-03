@@ -11,13 +11,13 @@ function createLiveStore(pool) {
     async load(date) {
       const { rows } = await pool.query('select symbol, position from live_state where date = $1', [date]);
       const open = await pool.query(
-        `select symbol, flow, side, entry, sl, target, quantity, entry_time as "entryTime", initial_sl as "initialSl", best
+        `select symbol, flow, side, entry, sl, target, quantity, entry_time as "entryTime", initial_sl as "initialSl", best, sl_time as "slTime"
          from paper_trades where date = $1 and status = 'open'`,
         [date]
       );
       const levels = new Map();
-      for (const { symbol, flow, initialSl, best, ...p } of open.rows) {
-        levels.set(`${symbol}|${flow}`, flow === 'trail' ? { ...p, initialSl, best } : p);
+      for (const { symbol, flow, initialSl, best, slTime, ...p } of open.rows) {
+        levels.set(`${symbol}|${flow}`, flow === 'trail' ? { ...p, initialSl, best, slTime } : p);
       }
       return {
         date,
@@ -75,9 +75,9 @@ function createLiveStore(pool) {
           );
         } else if (event.kind === 'TRAIL') {
           await client.query(
-            `update paper_trades set sl = $4, best = $5, updated_at = now()
+            `update paper_trades set sl = $4, best = $5, sl_time = $6, updated_at = now()
              where date = $1 and symbol = $2 and flow = $3 and status = 'open'`,
-            [date, event.symbol, flow, event.sl, event.best]
+            [date, event.symbol, flow, event.sl, event.best, event.time]
           );
         }
         await client.query('commit');
