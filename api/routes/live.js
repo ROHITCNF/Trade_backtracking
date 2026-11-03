@@ -16,8 +16,8 @@ const FLOW = { type: 'string', enum: ['fixed', 'trail'], default: 'fixed' };
 const DEFAULT_DAYS = 30;
 
 const TRADE_COLUMNS = `date::text as date, symbol, flow, status, side, quantity, entry_time as "entryTime", entry, sl, target,
-  exit_time as "exitTime", exit, reason, pnl, source, best`;
-const NUMERIC = ['entry', 'sl', 'target', 'exit', 'pnl', 'best'];
+  exit_time as "exitTime", exit, reason, pnl, source, initial_sl as "initialSl", best`;
+const NUMERIC = ['entry', 'sl', 'target', 'exit', 'pnl', 'initialSl', 'best'];
 
 function rowToTrade(row) {
   const t = { ...row };

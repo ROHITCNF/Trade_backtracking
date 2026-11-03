@@ -11,13 +11,13 @@ function createLiveStore(pool) {
     async load(date) {
       const { rows } = await pool.query('select symbol, position from live_state where date = $1', [date]);
       const open = await pool.query(
-        `select symbol, flow, side, entry, sl, target, quantity, entry_time as "entryTime", best
+        `select symbol, flow, side, entry, sl, target, quantity, entry_time as "entryTime", initial_sl as "initialSl", best
          from paper_trades where date = $1 and status = 'open'`,
         [date]
       );
       const levels = new Map();
-      for (const { symbol, flow, best, ...p } of open.rows) {
-        levels.set(`${symbol}|${flow}`, flow === 'trail' ? { ...p, best } : p);
+      for (const { symbol, flow, initialSl, best, ...p } of open.rows) {
+        levels.set(`${symbol}|${flow}`, flow === 'trail' ? { ...p, initialSl, best } : p);
       }
       return {
         date,
@@ -60,11 +60,11 @@ function createLiveStore(pool) {
         );
         if (event.kind === 'ENTRY') {
           await client.query(
-            `insert into paper_trades (date, symbol, flow, status, side, quantity, entry_time, entry, sl, target, best)
-             values ($1, $2, $3, 'open', $4, $5, $6, $7, $8, $9, $10)
+            `insert into paper_trades (date, symbol, flow, status, side, quantity, entry_time, entry, sl, target, initial_sl, best)
+             values ($1, $2, $3, 'open', $4, $5, $6, $7, $8, $9, $10, $11)
              on conflict (date, symbol, flow) do nothing`,
             [date, event.symbol, flow, event.side, event.quantity, event.time, event.price, event.sl, event.target ?? null,
-              flow === 'trail' ? (event.best ?? event.price) : null]
+              flow === 'trail' ? event.sl : null, flow === 'trail' ? (event.best ?? event.price) : null]
           );
         } else if (event.kind === 'EXIT') {
           await client.query(
