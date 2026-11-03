@@ -5,6 +5,8 @@ milestone. Progress lives in the issues; this file is the map.
 
 ## Workflow per task
 
+Since M9 this is automated by `/ship`; see [workflow.md](workflow.md).
+
 1. Branch from `main`: `<milestone>/<issue>-<slug>` (e.g. `m1/15-test-harness`).
 2. Implement, with tests where the task says so. `npm test` must pass.
 3. Open a PR to `main` that says `Closes #<issue>`.
@@ -112,6 +114,25 @@ The v2 design in `docs/design/reference/v2/`, frontend only ([decisions.md](deci
 | [#105](https://github.com/ROHITCNF/Trade_backtracking/issues/105) | Filter paper trades by watchlist |
 | [#106](https://github.com/ROHITCNF/Trade_backtracking/issues/106) | Live page: range presets, date picker, watchlist dropdown |
 | [#111](https://github.com/ROHITCNF/Trade_backtracking/issues/111) | Live page v2: trade list + trade panel (D23) |
+
+## M9 · AI-native workflow
+
+[workflow.md](workflow.md). CI, guards, agents and skills so every task runs `/feature` → `/ship`.
+GitHub milestone 9; its branches were named `m8/…` before the milestone was renumbered to follow
+this file.
+
+| issue | task |
+|---|---|
+| [#124](https://github.com/ROHITCNF/Trade_backtracking/issues/124) | CI: GitHub Actions + branch protection |
+| [#125](https://github.com/ROHITCNF/Trade_backtracking/issues/125) | Lint: Biome with repo-specific rules |
+| [#126](https://github.com/ROHITCNF/Trade_backtracking/issues/126) | PR template and area labels |
+| [#127](https://github.com/ROHITCNF/Trade_backtracking/issues/127) | Claude hook: block prod DATABASE_URL, confirm Fyers-spending scripts |
+| [#128](https://github.com/ROHITCNF/Trade_backtracking/issues/128) | E2E harness: Playwright + stub API + smoke specs |
+| [#129](https://github.com/ROHITCNF/Trade_backtracking/issues/129) | engine-rules skill and per-area review checklists |
+| [#130](https://github.com/ROHITCNF/Trade_backtracking/issues/130) | Agents: pr-creator, e2e-tester, pr-reviewer, test-writer |
+| [#131](https://github.com/ROHITCNF/Trade_backtracking/issues/131) | Skills: /feature, /decision, /review, /e2e |
+| [#132](https://github.com/ROHITCNF/Trade_backtracking/issues/132) | /ship orchestrator skill |
+| [#133](https://github.com/ROHITCNF/Trade_backtracking/issues/133) | Docs: workflow.md, CLAUDE.md, plan.md M9 |
 
 ## Owner involvement
 

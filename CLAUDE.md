@@ -14,10 +14,12 @@ node runAll.js all final.txt # every ticker in lists/final.txt  (npm run final)
 npm run core                 # summary.js over lists/core.txt -> out/summary.html
 npm run live                 # live paper runner (see server/architecture.md)
 npm run today                # print today's live decision log
-npm test                     # node --test over test/*.test.js
+npm test                     # node --test over test/*.test.js (DB tests need TEST_DATABASE_URL=postgres://localhost/postgres)
+npm run lint                 # Biome; errors fail CI (engine purity, Fyers imports)
 npm run api                  # web API + run worker (api/), needs DATABASE_URL
 npm run migrate              # apply api/db/migrations to DATABASE_URL
 npm run web                  # React frontend (web/, Vite) on :5173; `npm --prefix web test` for its tests
+npm --prefix web run e2e     # Playwright, light + dark, on a stub API (web/e2e/server.cjs); needs local Postgres
 ```
 
 The web app's screens are Journal (`/`), Research (`/research`), Live (`/live`) and the ticker
@@ -41,6 +43,19 @@ that exist. `summary.js` writes one page with a row per symbol and pooled totals
 One dependency (`fyers-api-v3`), no build step, Node 18+. `npm test` runs `node --test` over
 `test/*.test.js` (built-in runner, no extra deps). The engine is a pure function, so tests feed it
 synthetic candles built with `test/helpers.js`; add a test there when changing engine behaviour.
+
+## Workflow
+
+Work goes idea → `/feature` (issue with acceptance criteria) → `/ship #N` → reviewed PR →
+merge on green CI. `docs/workflow.md` has the loop, the agents (`.claude/agents/`), skills
+(`.claude/skills/`) and review checklists (`.claude/review/`). The rules that matter:
+
+- `main` is protected: `core tests`, `web tests + build`, `lint` and `e2e` must pass. Squash-merge only.
+- PRs labelled `area:engine`, `area:live` or `area:db` wait for the owner. Everything else auto-merges
+  after `pr-reviewer` returns `VERDICT: APPROVE`.
+- `.claude/hooks/guard.js` denies commands that would use `.env`'s production `DATABASE_URL`,
+  read `.env`, or spend Fyers budget without asking. Pass PR and issue bodies with `-F <file>`.
+- When work changes a rule, the `/decision` entry or the CLAUDE.md edit goes in the same PR.
 
 ## Pipeline
 
