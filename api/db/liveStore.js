@@ -76,7 +76,7 @@ function createLiveStore(pool) {
         } else if (event.kind === 'TRAIL') {
           await client.query(
             `update paper_trades set sl = $4, best = $5, sl_time = $6, updated_at = now()
-             where date = $1 and symbol = $2 and flow = $3 and status = 'open'`,
+             where date = $1 and symbol = $2 and flow = 'trail' and $3 = 'trail' and status = 'open'`,
             [date, event.symbol, flow, event.sl, event.best, event.time]
           );
         }

@@ -82,7 +82,7 @@ test('paper trades come back by date range with totals, and decisions by day', {
     ]);
     assert.deepEqual(body.trades[1], {
       date: '2026-01-05', symbol: 'NSE:A-EQ', flow: 'fixed', status: 'closed', side: 'long', quantity: 10, entryTime: '09:31',
-      entry: 100, sl: 99, target: 101.5, exitTime: '10:02', exit: 101.5, reason: 'TARGET', pnl: 15, source: 'live', initialSl: null, best: null,
+      entry: 100, sl: 99, target: 101.5, exitTime: '10:02', exit: 101.5, reason: 'TARGET', pnl: 15, source: 'live', initialSl: null, best: null, slTime: null,
     });
     assert.equal(body.trades[0].target, null);
     assert.deepEqual(body.summary, { trades: 2, open: 1, closed: 1, wins: 1, losses: 0, winRate: 100, netPnl: 15 });
@@ -191,7 +191,7 @@ test('paper trades filter by flow, fixed by default (M10)', { skip: noDb }, () =
 
     const trail = (await call(`/api/paper-trades?from=${D}&to=${D}&flow=trail`)).json();
     assert.equal(trail.flow, 'trail');
-    assert.deepEqual(trail.trades.map((t) => [t.flow, t.initialSl, t.sl, t.best, t.target, t.pnl]), [['trail', 99, 99.5, 100.5, null, -5]]);
+    assert.deepEqual(trail.trades.map((t) => [t.flow, t.initialSl, t.sl, t.best, t.slTime, t.target, t.pnl]), [['trail', 99, 99.5, 100.5, '09:35', null, -5]]);
     assert.equal(trail.summary.netPnl, -5);
 
     assert.equal((await call(`/api/paper-trades?flow=both`)).statusCode, 400);
