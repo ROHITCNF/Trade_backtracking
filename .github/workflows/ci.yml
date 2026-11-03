@@ -12,6 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Errors fail (repo rules in biome.json overrides); warnings are reported only.
+      - run: npx biome ci --formatter-enabled=false --reporter=github .
+
   core:
     name: core tests
     runs-on: ubuntu-latest

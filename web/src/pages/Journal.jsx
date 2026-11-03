@@ -48,7 +48,7 @@ function UpdateNote({ data, queueError, canQueue, onRetry }) {
         <Icon name="alert" />
         <span><b>Updating {failed.map((s) => s.list.name).join(', ')} failed.</b> {failed[0].failed.error}</span>
         <span className="spacer" />
-        <button className="btn" onClick={() => failed.forEach((s) => onRetry(s.failed.id))}>Retry</button>
+        <button className="btn" onClick={() => failed.forEach((s) => { onRetry(s.failed.id); })}>Retry</button>
       </div>
     );
   }

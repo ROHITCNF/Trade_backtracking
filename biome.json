@@ -1,0 +1,105 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**/*.js",
+      "**/*.jsx",
+      "**/*.json",
+      "!**/package-lock.json",
+      "!web/src/components/ui",
+      "!research",
+      "!docs"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": "warn",
+      "suspicious": {
+        "noArrayIndexKey": "warn",
+        "noAssignInExpressions": "warn"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "warn"
+      }
+    }
+  },
+  "assist": {
+    "enabled": false
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**",
+        "!src/fyers.js",
+        "!server/feed.js"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "fyers-api-v3": "Fyers REST goes through rest() in src/fyers.js (rate limit + daily budget; 3 breaches block the account). Import from ./fyers instead."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/engine.js"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "fs": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "node:fs": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "path": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "node:path": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "net": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "https": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "http": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "fyers-api-v3": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "./fyers": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "./fetch": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "./tradeLog": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "./report": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline).",
+                  "pg": "src/engine.js is a pure function: candles + config in, trades out. No network, disk or Fyers (CLAUDE.md \u00a7 Pipeline)."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

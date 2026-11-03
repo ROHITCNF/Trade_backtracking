@@ -81,7 +81,7 @@ export function useJournal() {
     if (!data) return;
     const ids = supersededRuns(data.state).filter((id) => !deleted.has(id));
     if (!ids.length) return;
-    ids.forEach((id) => deleted.add(id));
+    ids.forEach((id) => { deleted.add(id); });
     Promise.all(ids.map((id) => api(`/api/runs/${id}`, { method: 'DELETE' }).catch(() => {})));
   }, [data]);
 
