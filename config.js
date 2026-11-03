@@ -42,6 +42,12 @@ module.exports = {
   targetR: 1, // only used when targetMode is 'R'
   targetPct: 1.5,
 
+  // Live paper only (M10, D25). Beside the fixed stop and target above, live
+  // records a second 'trail' trade on every entry: same entry and starting
+  // stop, no target, and for every stepPct % of entry the best price moves in
+  // favour, the stop moves the same amount (never back). The backtest ignores it.
+  trail: { enabled: true, stepPct: 0.5 },
+
   // Opening range window. orbEnd is exclusive, so 09:15-09:29 = first 15 one-min candles.
   orbStart: "09:15",
   orbEnd: "09:30",
