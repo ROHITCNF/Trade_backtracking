@@ -67,7 +67,7 @@ It returns the PR URL. Don't arm auto-merge yet.
 ## 7. Review
 Run the `/review` skill's procedure: launch **pr-reviewer** with model `opus` if gated, else
 `sonnet`. Prompt: `Review PR #<pr>.` plus the e2e report.
-- `VERDICT: APPROVE`: go to 7.
+- `VERDICT: APPROVE`: go to 8.
 - `VERDICT: CHANGES`: fix every **Must fix**, plus any **Should fix** that is cheap and in scope.
   Rerun 3 (and 4 if the fix touched `web/` or `api/`), push, and comment on the PR listing what changed per finding.
   Then rerun the reviewer.
