@@ -65,7 +65,7 @@ changing them.
   fyers, ci, claude.
 - **Labels**: `area:engine|live|api|db|fyers|web|infra`. They pick the review checklists in
   `.claude/review/` and decide G2.
-- **Squash-merge only**; the branch is deleted on merge.
+- **Squash-merge only** (the repo disables merge commits and rebase merges); the branch is deleted on merge.
 - **Testing never touches production**: unit DB tests use `TEST_DATABASE_URL` on a local server;
   E2E uses `web/e2e/server.cjs` (its own throwaway database, Fyers stubbed).
 
@@ -76,4 +76,6 @@ pg_isready                       # local Postgres must be up
 npm --prefix web run e2e         # starts the stub API + Vite, runs light and dark projects
 node web/e2e/server.cjs & npm run web   # preview the UI on fake data; password e2e-password
 ```
+The stub API listens on :4000, the same port as `npm run api`, so stop it (`kill %1`) before running
+the real API. Ctrl-C/SIGTERM drops its throwaway database.
 Screenshots: `web/e2e/screenshots/<theme>/`. In CI they're uploaded as the `e2e-screenshots` artifact.
