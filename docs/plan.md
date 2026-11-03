@@ -134,6 +134,18 @@ this file.
 | [#132](https://github.com/ROHITCNF/Trade_backtracking/issues/132) | /ship orchestrator skill |
 | [#133](https://github.com/ROHITCNF/Trade_backtracking/issues/133) | Docs: workflow.md, CLAUDE.md, plan.md M9 |
 
+## M10 · Trailing-stop paper flow
+
+Live records a second paper flow beside the fixed stop and target, on the same entry: same
+starting stop, no target, and the stop steps with the price (0.5% of entry per 0.5% move in favour).
+Live only; the backtest and reconciliation stay on the fixed flow. [decisions.md](decisions.md) D25.
+
+| issue | task |
+|---|---|
+| [#148](https://github.com/ROHITCNF/Trade_backtracking/issues/148) | Store paper trades per flow (fixed \| trail) |
+| [#149](https://github.com/ROHITCNF/Trade_backtracking/issues/149) | Live: trailing-stop paper flow beside the fixed flow |
+| [#150](https://github.com/ROHITCNF/Trade_backtracking/issues/150) | Live page: Fixed / Trail toggle with stepped SL |
+
 ## Owner involvement
 
 Only M5 needs the owner:

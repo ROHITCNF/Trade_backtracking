@@ -11,11 +11,13 @@ const { loadWatchlist } = require('../live');
 const baseConfig = require('../../config');
 
 const DATE = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' };
+// Live records two paper flows per breakout (M10): 'fixed' and 'trail'.
+const FLOW = { type: 'string', enum: ['fixed', 'trail'], default: 'fixed' };
 const DEFAULT_DAYS = 30;
 
-const TRADE_COLUMNS = `date::text as date, symbol, status, side, quantity, entry_time as "entryTime", entry, sl, target,
-  exit_time as "exitTime", exit, reason, pnl, source`;
-const NUMERIC = ['entry', 'sl', 'target', 'exit', 'pnl'];
+const TRADE_COLUMNS = `date::text as date, symbol, flow, status, side, quantity, entry_time as "entryTime", entry, sl, target,
+  exit_time as "exitTime", exit, reason, pnl, source, initial_sl as "initialSl", best, sl_time as "slTime"`;
+const NUMERIC = ['entry', 'sl', 'target', 'exit', 'pnl', 'initialSl', 'best'];
 
 function rowToTrade(row) {
   const t = { ...row };
@@ -101,11 +103,12 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
 
   app.get(
     '/api/paper-trades',
-    { schema: { querystring: { type: 'object', properties: { from: DATE, to: DATE, watchlist: { type: 'integer', minimum: 1 } } } } },
+    { schema: { querystring: { type: 'object', properties: { from: DATE, to: DATE, watchlist: { type: 'integer', minimum: 1 }, flow: FLOW } } } },
     async (request) => {
       const to = request.query.to || istToday();
       const from = request.query.from || daysBefore(to, DEFAULT_DAYS - 1);
       const listId = request.query.watchlist;
+      const flow = request.query.flow;
 
       // With a watchlist, everything below narrows to its symbols (D22).
       let listed = null;
@@ -124,10 +127,10 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
       }
 
       const { rows } = await db.query(
-        `select ${TRADE_COLUMNS} from paper_trades where date between $1 and $2
+        `select ${TRADE_COLUMNS} from paper_trades where date between $1 and $2 and flow = $4
            and ($3::text[] is null or symbol = any($3))
          order by date desc, entry_time desc, symbol`,
-        [from, to, listed ? [...listed] : null]
+        [from, to, listed ? [...listed] : null, flow]
       );
       const trades = rows.map(rowToTrade);
       const rec = await db.query(
@@ -141,7 +144,7 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
         for (const t of trades) if (t.source === 'backtest') backfilledOn.set(t.date, (backfilledOn.get(t.date) || 0) + 1);
         reconciliations = reconciliations.map((r) => reconForList(r, { listed, live: liveSet, backfilledOn }));
       }
-      return { from, to, trades, ...summarize(trades), reconciliations, ...(coverage && { coverage }) };
+      return { from, to, flow, trades, ...summarize(trades), reconciliations, ...(coverage && { coverage }) };
     }
   );
 
@@ -180,10 +183,19 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
   // like /api/trades/:id/candles for backtest trades.
   app.get(
     '/api/paper-trades/:date/:symbol/candles',
-    { schema: { params: { type: 'object', properties: { date: DATE, symbol: { type: 'string', maxLength: 64 } } } } },
+    {
+      schema: {
+        params: { type: 'object', properties: { date: DATE, symbol: { type: 'string', maxLength: 64 } } },
+        querystring: { type: 'object', properties: { flow: FLOW } },
+      },
+    },
     async (request, reply) => {
       const { date, symbol } = request.params;
-      const { rows } = await db.query(`select ${TRADE_COLUMNS} from paper_trades where date = $1 and symbol = $2`, [date, symbol]);
+      const { rows } = await db.query(`select ${TRADE_COLUMNS} from paper_trades where date = $1 and symbol = $2 and flow = $3`, [
+        date,
+        symbol,
+        request.query.flow,
+      ]);
       if (!rows.length) throw httpError(404, 'Paper trade not found');
       let candles;
       try {

@@ -81,8 +81,8 @@ test('paper trades come back by date range with totals, and decisions by day', {
       ['2026-01-05', 'NSE:A-EQ', 'closed'],
     ]);
     assert.deepEqual(body.trades[1], {
-      date: '2026-01-05', symbol: 'NSE:A-EQ', status: 'closed', side: 'long', quantity: 10, entryTime: '09:31',
-      entry: 100, sl: 99, target: 101.5, exitTime: '10:02', exit: 101.5, reason: 'TARGET', pnl: 15, source: 'live',
+      date: '2026-01-05', symbol: 'NSE:A-EQ', flow: 'fixed', status: 'closed', side: 'long', quantity: 10, entryTime: '09:31',
+      entry: 100, sl: 99, target: 101.5, exitTime: '10:02', exit: 101.5, reason: 'TARGET', pnl: 15, source: 'live', initialSl: null, best: null, slTime: null,
     });
     assert.equal(body.trades[0].target, null);
     assert.deepEqual(body.summary, { trades: 2, open: 1, closed: 1, wins: 1, losses: 0, winRate: 100, netPnl: 15 });
@@ -122,6 +122,13 @@ test('paper trade candles come with its opening range and marker times', { skip:
     assert.equal(body.trade.orbLow, 99);
     assert.equal(body.trade.entryTs, day[15][0]);
     assert.equal(body.trade.exitTs, null, 'open trade has no exit marker');
+
+    // The candle route picks a flow too: fixed by default, trail on request.
+    await store.logDecision('2026-01-05', ev('ENTRY', 'NSE:A-EQ', { flow: 'trail', price: 101, sl: 100, target: null, time: '09:30' }));
+    assert.equal((await call('/api/paper-trades/2026-01-05/NSE:A-EQ/candles')).json().trade.flow, 'fixed');
+    const tr = (await call('/api/paper-trades/2026-01-05/NSE:A-EQ/candles?flow=trail')).json().trade;
+    assert.deepEqual([tr.flow, tr.target, tr.best], ['trail', null, 101]);
+    assert.equal((await call('/api/paper-trades/2026-01-05/NSE:NOTOKEN-EQ/candles?flow=trail')).statusCode, 404);
 
     assert.equal((await call('/api/paper-trades/2026-01-05/NSE:NONE-EQ/candles')).statusCode, 404);
     assert.equal((await call('/api/paper-trades/2026-01-05/NSE:NOTOKEN-EQ/candles')).statusCode, 409);
@@ -165,4 +172,27 @@ test('a watchlist narrows trades, totals and reconciliations, and reports what l
 
     const status = (await call('/api/live/status')).json();
     assert.equal(status.lastTradeDate, '2026-01-05');
+  }));
+
+test('paper trades filter by flow, fixed by default (M10)', { skip: noDb }, () =>
+  withApi(async ({ call, pool }) => {
+    const store = createLiveStore(pool);
+    const D = '2026-01-05';
+    await store.logDecision(D, ev('ENTRY', 'NSE:A-EQ', { price: 100, sl: 99, target: 101.5 }));
+    await store.logDecision(D, ev('EXIT', 'NSE:A-EQ', { price: 99, reason: 'SL', pnl: -10, time: '09:40' }));
+    await store.logDecision(D, ev('ENTRY', 'NSE:A-EQ', { flow: 'trail', price: 100, sl: 99, target: null }));
+    await store.logDecision(D, ev('TRAIL', 'NSE:A-EQ', { flow: 'trail', sl: 99.5, best: 100.5, time: '09:35' }));
+    await store.logDecision(D, ev('EXIT', 'NSE:A-EQ', { flow: 'trail', price: 99.5, reason: 'SL', pnl: -5, time: '09:41' }));
+
+    const fixed = (await call(`/api/paper-trades?from=${D}&to=${D}`)).json();
+    assert.equal(fixed.flow, 'fixed');
+    assert.deepEqual(fixed.trades.map((t) => [t.flow, t.pnl, t.best]), [['fixed', -10, null]]);
+    assert.equal(fixed.summary.netPnl, -10);
+
+    const trail = (await call(`/api/paper-trades?from=${D}&to=${D}&flow=trail`)).json();
+    assert.equal(trail.flow, 'trail');
+    assert.deepEqual(trail.trades.map((t) => [t.flow, t.initialSl, t.sl, t.best, t.slTime, t.target, t.pnl]), [['trail', 99, 99.5, 100.5, '09:35', null, -5]]);
+    assert.equal(trail.summary.netPnl, -5);
+
+    assert.equal((await call(`/api/paper-trades?flow=both`)).statusCode, 400);
   }));

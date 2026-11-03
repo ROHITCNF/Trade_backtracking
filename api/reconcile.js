@@ -13,6 +13,9 @@
 // On a day the live session never ran (no decisions at all: the instance slept,
 // Fyers wasn't connected), the backtest's trades are written to paper_trades
 // with source = 'backtest' instead, so the history has no holes.
+//
+// Only the 'fixed' flow is checked or backfilled. The 'trail' flow (M10) is
+// live only: the backtest has no trailing stop to compare it with.
 
 const baseConfig = require('../config');
 const { runBacktest } = require('../src/engine');
@@ -69,7 +72,7 @@ const brief = (t) => t && {
 
 async function reconcileDay({ pool, date, symbols, config = baseConfig, getCandles = fetchCandles, log = () => {} }) {
   const { rows: liveRows } = await pool.query(
-    `select symbol, status, side, entry, exit, reason, pnl, entry_time, exit_time from paper_trades where date = $1 and source = 'live'`,
+    `select symbol, status, side, entry, exit, reason, pnl, entry_time, exit_time from paper_trades where date = $1 and source = 'live' and flow = 'fixed'`,
     [date]
   );
   const live = new Map(liveRows.map((r) => [r.symbol, r]));
@@ -124,7 +127,7 @@ async function reconcileDay({ pool, date, symbols, config = baseConfig, getCandl
         `insert into paper_trades (date, symbol, status, side, quantity, entry_time, entry, sl, target,
            exit_time, exit, reason, pnl, source)
          values ($1, $2, 'closed', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'backtest')
-         on conflict (date, symbol) do nothing`,
+         on conflict (date, symbol, flow) do nothing`,
         [date, symbol, t.side, t.quantity, t.entryTime, t.entry, t.sl, t.target, t.exitTime, t.exit, t.reason, t.pnl]
       );
     }

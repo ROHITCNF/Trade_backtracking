@@ -102,3 +102,50 @@ test('an open position loads with its levels from paper_trades (D24)', { skip: n
     );
     assert.deepEqual(symbols['NSE:B-EQ'], { position: 'CLOSED' });
   }));
+
+test('fixed and trail trades for one symbol and day live side by side (M10)', { skip: noDb }, () =>
+  withStore(async (store, pool) => {
+    const SYM = 'NSE:A-EQ';
+    await store.logDecision(DATE, entry(SYM)); // no flow: fixed
+    await store.logDecision(DATE, { ...entry(SYM), flow: 'trail', target: null });
+    await store.logDecision(DATE, { ...entry(SYM), flow: 'trail', price: 999, target: null }); // repeat: no-op
+    await store.logDecision(DATE, { kind: 'TRAIL', symbol: SYM, flow: 'trail', sl: 102, best: 103.02, time: '09:50' });
+    await store.logDecision(DATE, exit(SYM)); // closes fixed only
+
+    const q = () => pool.query('select flow, status, entry::float, sl::float, initial_sl::float, target::float, best::float, reason from paper_trades order by flow');
+    assert.deepEqual((await q()).rows, [
+      { flow: 'fixed', status: 'closed', entry: 102, sl: 100.98, initial_sl: null, target: 103.02, best: null, reason: 'SL' },
+      { flow: 'trail', status: 'open', entry: 102, sl: 102, initial_sl: 100.98, target: null, best: 103.02, reason: null },
+    ]);
+
+    await store.save({ date: DATE, symbols: { [SYM]: { position: 'OPEN' } } });
+    const { symbols } = await store.load(DATE);
+    const { trail, ...rest } = symbols[SYM];
+    assert.deepEqual(rest, { position: 'OPEN' }); // fixed is closed, so no fixed levels
+    assert.deepEqual(
+      { ...trail, entry: Number(trail.entry), sl: Number(trail.sl), initialSl: Number(trail.initialSl), best: Number(trail.best) },
+      { side: 'long', entry: 102, sl: 102, target: null, quantity: 5, entryTime: '09:31', initialSl: 100.98, best: 103.02, slTime: '09:50' }
+    );
+
+    await store.logDecision(DATE, { ...exit(SYM), flow: 'trail', price: 102, reason: 'SL', pnl: 0, time: '10:05' });
+    // A TRAIL without flow 'trail' must never move the fixed row's stop.
+    await store.logDecision(DATE, { kind: 'TRAIL', symbol: SYM, sl: 1, best: 2, time: '09:55' });
+    assert.equal((await q()).rows[0].sl, 100.98);
+    // A TRAIL after the exit must not move a closed trade's stop.
+    await store.logDecision(DATE, { kind: 'TRAIL', symbol: SYM, flow: 'trail', sl: 110, best: 111, time: '10:06' });
+    assert.deepEqual((await q()).rows[1], { flow: 'trail', status: 'closed', entry: 102, sl: 102, initial_sl: 100.98, target: null, best: 103.02, reason: 'SL' });
+    const log = await pool.query('select kind, payload->>\'flow\' as flow from live_decisions order by id');
+    assert.deepEqual(log.rows.map((r) => `${r.kind}:${r.flow}`), ['ENTRY:null', 'ENTRY:trail', 'ENTRY:trail', 'TRAIL:trail', 'EXIT:null', 'EXIT:trail', 'TRAIL:null', 'TRAIL:trail']);
+  }));
+
+test('a restored open position carries both flows when both are open', { skip: noDb }, () =>
+  withStore(async (store) => {
+    await store.logDecision(DATE, entry('NSE:A-EQ'));
+    await store.logDecision(DATE, { ...entry('NSE:A-EQ'), flow: 'trail', target: null });
+    await store.save({ date: DATE, symbols: { 'NSE:A-EQ': { position: 'OPEN' } } });
+    const s = (await store.load(DATE)).symbols['NSE:A-EQ'];
+    assert.equal(Number(s.target), 103.02);
+    assert.equal(s.trail.target, null);
+    assert.equal(Number(s.trail.best), 102); // best starts at the entry price
+    assert.equal(s.trail.slTime, null); // still the starting stop
+  }));

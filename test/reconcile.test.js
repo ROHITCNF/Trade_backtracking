@@ -157,3 +157,23 @@ test('reconcile endpoint runs a past day and the list returns its result', { ski
       await app.close();
     }
   }));
+
+test('reconcile checks only the fixed flow and leaves trail trades alone (M10)', { skip: noDb }, () =>
+  withDb(async (pool, store) => {
+    await recordLive(store, btA);
+    // A trail trade on the same symbol that a backtest could never match.
+    await store.logDecision(DATE, { kind: 'ENTRY', symbol: 'NSE:A-EQ', flow: 'trail', side: 'long', price: btA.entry, quantity: btA.quantity, sl: btA.sl, target: null, time: btA.entryTime });
+    await store.logDecision(DATE, { kind: 'EXIT', symbol: 'NSE:A-EQ', flow: 'trail', side: 'long', price: 999, quantity: btA.quantity, reason: 'EOD', pnl: 5000, time: '15:14' });
+    const r = await reconcileDay({ pool, date: DATE, symbols: ['NSE:A-EQ', 'NSE:B-EQ'], config: cfg, getCandles });
+    assert.deepEqual([r.checked, r.matched, r.mismatches], [2, 2, []]);
+    const { rows } = await pool.query(`select flow, source, exit::float from paper_trades order by flow`);
+    assert.deepEqual(rows.map((x) => [x.flow, x.source]), [['fixed', 'live'], ['trail', 'live']]);
+    assert.equal(rows[1].exit, 999);
+  }));
+
+test('a backfilled day writes fixed rows only', { skip: noDb }, () =>
+  withDb(async (pool) => {
+    await reconcileDay({ pool, date: DATE, symbols: ['NSE:A-EQ'], config: cfg, getCandles });
+    const { rows } = await pool.query('select flow, source from paper_trades');
+    assert.deepEqual(rows, [{ flow: 'fixed', source: 'backtest' }]);
+  }));
