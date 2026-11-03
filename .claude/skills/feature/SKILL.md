@@ -1,7 +1,7 @@
 ---
 name: feature
-description: Turn a one-line idea into GitHub issue(s) ready for /ship. Asks at most three questions, then files an issue with Why, Acceptance criteria, Out of scope, Design ref, area labels and milestone. A large idea becomes a milestone of ordered issues plus a docs/plan.md section.
-argument-hint: <idea in a sentence or two>
+description: Turn an idea into GitHub issue(s) ready for /ship. Small ideas: at most three questions, then files. Large ideas: brainstorm and an approved plan first, then files an issue with Why, Acceptance criteria, Out of scope, Design ref, area labels and milestone. A large idea becomes a milestone of ordered issues plus a docs/plan.md section.
+argument-hint: <idea in a sentence or two, or "as discussed"> [brainstorm]
 disable-model-invocation: true
 ---
 
@@ -21,9 +21,23 @@ checks against them. Write them so a stranger could verify each one.
   - **large**: several PRs or several areas, a schema change plus UI, or anything that would leave
     `main` half-working between PRs
 
-## 2. Ask: at most 3 questions, in one AskUserQuestion call
+If the conversation already discussed the idea ("as discussed"), build on what was agreed there.
+
+## 2a. Small: at most 3 questions, in one AskUserQuestion call
 Only ask what changes what gets built: scope edges, a behaviour choice, a design reference.
 Put your recommendation first. Skip this step if the idea is already unambiguous.
+
+## 2b. Large (or the owner wrote `brainstorm`): brainstorm, then a plan the owner approves
+1. **Discuss** in rounds, as many as it takes. Each round asks up to 4 questions, with options and
+   your recommendation first. Name the risks and any `docs/decisions.md` entry the idea conflicts with.
+   Stop when every open point either changes nothing about what gets built or has an answer.
+2. **Draft** a short plan in chat:
+   - the goal
+   - what's in and out of scope
+   - the steps in order, each one shippable on its own
+   - the questions still open
+3. **G0: file nothing until the owner approves the plan.** If they change it, revise it and show it again.
+   Then continue to step 3 with the approved plan.
 
 ## 3. Write
 Use this body for each issue, written to a temp file and passed with `-F`, never inline:

@@ -36,6 +36,9 @@ Claude opens issue #150 (`area:web`) with Why, Acceptance criteria ("each card s
 
 **3. Done.** You did two things: wrote one line and approved one issue.
 
+**A big feature**: brainstorm in chat, or let `/feature` detect it (or add `brainstorm`). It asks in
+rounds, shows a plan, and files issues only once you approve the plan (G0).
+
 **An engine feature** (`area:engine`, e.g. a trailing stop) differs in three ways: **test-writer** writes tests
 from the acceptance criteria without seeing the code, the reviewer runs on Opus, and step 8 stops for
 **you to merge (gate G2)**.
