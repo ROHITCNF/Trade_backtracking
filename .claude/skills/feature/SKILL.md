@@ -37,7 +37,7 @@ Put your recommendation first. Skip this step if the idea is already unambiguous
    - the steps in order, each one shippable on its own
    - the questions still open
 3. **G0: file nothing until the owner approves the plan.** If they change it, revise it and show it again.
-   Then continue to step 3 with the approved plan.
+   Then continue to section 3 (Write) with the approved plan.
 
 ## 3. Write
 Use this body for each issue, written to a temp file and passed with `-F`, never inline:
@@ -61,7 +61,7 @@ Use this body for each issue, written to a temp file and passed with `-F`, never
 ```
 - **small**: `gh issue create -t "<imperative title>" -F <file> -l area:<x> [-m "<open milestone>"]`
 - **large**:
-  1. `gh api "repos/{owner}/{repo}/milestones" -f title="M<next> · <name>" -f description="…"`
+  1. `gh api "repos/{owner}/{repo}/milestones" -f title="M<next> · <name>" -f description="<the approved plan, if there was one>"`
      (the next M-number is one above the highest existing).
   2. Split into issues that **each leave `main` working**: data or API before the UI that uses it,
      and interim routes over half-built screens. Order them, file each into the milestone.

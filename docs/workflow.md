@@ -4,6 +4,7 @@ You write the idea and approve the issue. Claude does the rest. CI decides the m
 
 ```
 /feature "<idea>"  →  issue            ← you approve it (G1)
+                      big idea: plan first ← you approve the plan (G0)
 /ship #N           →  branch → code → tests → e2e → PR → review → merge
                                                     engine/live/db: you merge (G2)
 ```
