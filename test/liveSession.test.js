@@ -20,11 +20,11 @@ function memoryStore(initial = null) {
 
 // A session wired to fakes: warm start hands back `candles`, the feed captures
 // its handlers so the test can push ticks and reconnects by hand.
-function harness({ candles = openingRange(DATE), store = memoryStore() } = {}) {
+function harness({ candles = openingRange(DATE), store = memoryStore(), cfg = config() } = {}) {
   const feed = { closed: 0 };
   const session = createLiveSession({
     symbols: [SYM],
-    config: config(),
+    config: cfg,
     store,
     date: DATE,
     log: () => {},
@@ -266,4 +266,17 @@ test('a restart mid-trade with nothing missed keeps holding and watches ticks', 
   feed.onTick(SYM, 102.3, at('10:00'));
   await settle();
   assert.deepEqual(store.decisions.map((d) => [d.kind, d.reason, d.price]), [['EXIT', 'TARGET', 102.3]]);
+});
+
+test('with trail disabled no event carries a flow and no TRAIL or trail state appears', async () => {
+  const { session, store, feed, settle } = harness({ cfg: config({ trail: { enabled: false, stepPct: 0.5 } }) });
+  await session.start();
+  feed.onOpen();
+  feed.onTick(SYM, 101.0, at('09:31'));
+  feed.onTick(SYM, 102.0, at('09:32')); // +1% of entry: would step a trail
+  feed.onTick(SYM, 99.5, at('09:33'));
+  await settle();
+  assert.deepEqual(kinds(store), ['ENTRY', 'EXIT']);
+  for (const d of store.decisions) assert.equal('flow' in d, false);
+  assert.equal('trail' in store.state.symbols[SYM], false);
 });

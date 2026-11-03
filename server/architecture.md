@@ -17,6 +17,13 @@ breakout tick's price too. A 1-minute backtest can't see the order of prices ins
 candle and assumes the worst; live can see it, so it never re-asks the engine while it
 holds (which would also let a whipsaw candle swap a stopped-out long for a short).
 
+**The trail flow (D25) is the second thing live owns.** With `config.trail.enabled`, every
+entry also opens a `trail` paper position: same entry and starting stop as the engine's,
+no target, and `trail.js` steps the stop with the best price (every `stepPct` % of entry
+in favour moves it the same amount, never back). The engine knows nothing about it, and
+the backtest can't model it: a trailing stop depends on whether a candle's high came
+before its low. The two flows exit independently; the symbol is CLOSED once both are.
+
 ## How a tick becomes a decision
 
 ```
@@ -30,6 +37,8 @@ session.js, per symbol:
    FLAT    → runBacktest([completed] + [partial])   ← the engine, unmodified
              breakout on this tick? ENTRY at this tick's price, engine's stop/target
    OPEN    → this tick vs the position's own stop / target / sessionEnd → EXIT at this price
+             trail: this tick vs its current stop / sessionEnd → EXIT, else a new best
+             may step the stop → TRAIL (stop checked before it moves)
    CLOSED  → nothing (one trade a day)
    │
    ▼
@@ -51,6 +60,12 @@ at the level, EOD at the `sessionEnd` candle's close. A breakout found only in R
 candles fills where the backtest would. A restart restores an open position's levels
 from `paper_trades` (or the state file), never from the engine.
 
+The trail does the same with its current stop, then lets the candle's high (low, for a
+short) step it. It starts from the minute its stop was last set (`slTime`, saved with
+every step), not from the entry: earlier minutes were lived through with an older stop,
+and a low that was safe then may sit under today's stop. That minute itself isn't
+re-checked against the new stop, since its low may have come before the step.
+
 ## Files
 
 | file | job |
@@ -63,7 +78,8 @@ from `paper_trades` (or the state file), never from the engine.
 | `state.js` | file state store: decisions and positions in `data/live/`, survives a restart |
 | `session.js` | one day's loop that ties the above together, as `start()` / `stop()`; state goes through an injected store |
 | `live.js` | terminal host for `session.js` with the file store (`npm run live`) |
-| `broker/paper.js` | records simulated fills |
+| `trail.js` | the trail flow's stop for a given best price (pure) |
+| `broker/paper.js` | records simulated fills and trail stop moves |
 
 ## Why each awkward bit exists
 

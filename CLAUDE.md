@@ -137,7 +137,9 @@ version in sync with the `addCandlestickSeries` / `addAreaSeries` calls in the t
 
 `server/` runs the same `runBacktest` on live websocket ticks to find the entry, then manages the
 open position on the socket's prices (tick-price fills, first tick through stop/target exits; D24)
-and records paper decisions to `data/live/`. It places no orders. `src/engine.js` stays the only
+and records paper decisions to `data/live/`. It places no orders. Beside that fixed flow it
+records a `trail` flow on the same entries (`config.trail`, D25): same starting stop, no
+target, the stop stepping with the price. It is live only; the backtest never models it. `src/engine.js` stays the only
 place the entry rules and levels live; see `server/architecture.md` before touching it.
 
 The deployed API hosts the same session (`server/session.js` via `api/live.js`, on when

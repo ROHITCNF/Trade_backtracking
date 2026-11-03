@@ -35,6 +35,7 @@ const config = (overrides = {}) => ({
   orbStart: '09:15',
   orbEnd: '09:30',
   sessionEnd: '15:14',
+  trail: { enabled: false, stepPct: 0.5 }, // live trail flow off unless a test turns it on
   ...overrides,
 });
 
