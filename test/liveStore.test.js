@@ -128,6 +128,9 @@ test('fixed and trail trades for one symbol and day live side by side (M10)', { 
     );
 
     await store.logDecision(DATE, { ...exit(SYM), flow: 'trail', price: 102, reason: 'SL', pnl: 0, time: '10:05' });
+    // A TRAIL without flow 'trail' must never move the fixed row's stop.
+    await store.logDecision(DATE, { kind: 'TRAIL', symbol: SYM, sl: 1, best: 2, time: '09:55' });
+    assert.equal((await q()).rows[0].sl, 100.98);
     // A TRAIL after the exit must not move a closed trade's stop.
     await store.logDecision(DATE, { kind: 'TRAIL', symbol: SYM, flow: 'trail', sl: 110, best: 111, time: '10:06' });
     assert.deepEqual((await q()).rows[1], { flow: 'trail', status: 'closed', entry: 102, sl: 102, initial_sl: 100.98, target: null, best: 103.02, reason: 'SL' });
