@@ -4,6 +4,7 @@ You write the idea and approve the issue. Claude does the rest. CI decides the m
 
 ```
 /feature "<idea>"  →  issue            ← you approve it (G1)
+                      big idea: plan first ← you approve the plan (G0)
 /ship #N           →  branch → code → tests → e2e → PR → review → merge
                                                     engine/live/db: you merge (G2)
 ```
@@ -35,6 +36,9 @@ Claude opens issue #150 (`area:web`) with Why, Acceptance criteria ("each card s
 | 9 report | Claude tells you the PR number, what changed and the screenshots |
 
 **3. Done.** You did two things: wrote one line and approved one issue.
+
+**A big feature**: brainstorm in chat, or let `/feature` detect it (or add `brainstorm`). It asks in
+rounds, shows a plan, and files issues only once you approve the plan (G0).
 
 **An engine feature** (`area:engine`, e.g. a trailing stop) differs in three ways: **test-writer** writes tests
 from the acceptance criteria without seeing the code, the reviewer runs on Opus, and step 8 stops for
