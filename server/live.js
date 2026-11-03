@@ -19,9 +19,10 @@ const state = require('./state');
 const LIST = process.env.LIVE_LIST || 'core.txt';
 
 function printDecision(e) {
+  const head = `${e.time}  ${e.kind.padEnd(5)} ${shortSymbol(e.symbol).padEnd(12)}${e.flow ? ` ${e.flow.padEnd(5)}` : ''}`;
+  if (e.kind === 'TRAIL') return console.log(`${head} ${e.side} sl → ${e.sl}  best ${e.best}`);
   console.log(
-    `${e.time}  ${e.kind.padEnd(5)} ${shortSymbol(e.symbol).padEnd(12)}` +
-      ` ${e.side ?? ''} ${e.price} x${e.quantity}` +
+    `${head} ${e.side ?? ''} ${e.price} x${e.quantity}` +
       (e.reason ? `  ${e.reason} pnl ${e.pnl.toFixed(2)}` : `  sl ${e.sl} tgt ${e.target ?? '-'}`)
   );
 }
