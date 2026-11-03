@@ -101,13 +101,41 @@ function paperTrade(date, symbol, side, quantity, entryTime, exitTime, reason) {
   return [date, symbol, side, quantity, entryTime, entry, sl, target, exitTime, exit, reason, round(sign * (exit - entry) * quantity)];
 }
 
+// Trail rows (M10, #150) for the same entry as a fixed row: same entry and
+// starting SL (1% from entry), no target. Each step is [time, g], the stop
+// set g × entry from entry on the loss side (negative = past entry, in
+// profit), and it is written as a TRAIL decision too, as the live session logs
+// it. The trade exits at its last stop (SL) or at the close (EOD).
+function trailTrade(date, symbol, side, quantity, entryTime, steps, exitTime, reason) {
+  const close = (time) => {
+    const [h, m] = time.split(':').map(Number);
+    return dayCandles(symbol, date)[(h * 60 + m) - (9 * 60 + 15)][4];
+  };
+  const entry = close(entryTime);
+  const sign = side === 'long' ? 1 : -1;
+  const stopAt = (g) => round(entry * (1 - sign * g));
+  const initialSl = stopAt(0.01);
+  const stepped = steps.map(([time, g]) => ({ time, sl: stopAt(g), best: round(entry * (1 + sign * 0.012)) }));
+  const last = stepped.at(-1);
+  const sl = last ? last.sl : initialSl;
+  const exit = reason === 'EOD' ? close(exitTime) : sl;
+  return {
+    row: [date, symbol, side, quantity, entryTime, entry, sl, exitTime, exit, reason, round(sign * (exit - entry) * quantity), initialSl, last?.best ?? initialSl, last?.time ?? null],
+    decisions: stepped.map((s) => ({ date, symbol, time: s.time, sl: s.sl, best: s.best, side })),
+  };
+}
+
 async function seedPaperTrades(pool) {
   const days = lastWeekdays(3);
   const rows = [];
+  const trail = [];
   days.forEach((date, i) => {
     rows.push(paperTrade(date, 'NSE:SBIN-EQ', 'long', 10, '09:34', '10:12', 'TARGET'));
     rows.push(paperTrade(date, 'NSE:SBILIFE-EQ', 'short', 5, '09:41', '11:05', 'SL'));
     if (i === days.length - 1) rows.push(paperTrade(date, 'NSE:ETERNAL-EQ', 'long', 20, '09:52', '15:14', 'EOD'));
+    trail.push(trailTrade(date, 'NSE:SBIN-EQ', 'long', 10, '09:34', [['09:50', 0.005], ['10:05', -0.002]], '10:12', 'SL'));
+    trail.push(trailTrade(date, 'NSE:SBILIFE-EQ', 'short', 5, '09:41', [['10:00', 0.006], ['10:30', 0.003]], '11:05', 'SL'));
+    if (i === days.length - 1) trail.push(trailTrade(date, 'NSE:ETERNAL-EQ', 'long', 20, '09:52', [['11:00', 0.004]], '15:14', 'EOD'));
   });
   for (const r of rows) {
     await pool.query(
@@ -115,6 +143,18 @@ async function seedPaperTrades(pool) {
        values ($1, $2, 'closed', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       r,
     );
+  }
+  for (const { row, decisions } of trail) {
+    await pool.query(
+      `insert into paper_trades (date, symbol, status, side, quantity, entry_time, entry, sl, target, exit_time, exit, reason, pnl,
+         flow, initial_sl, best, sl_time)
+       values ($1, $2, 'closed', $3, $4, $5, $6, $7, null, $8, $9, $10, $11, 'trail', $12, $13, $14)`,
+      row,
+    );
+    for (const d of decisions) {
+      const payload = { kind: 'TRAIL', flow: 'trail', symbol: d.symbol, side: d.side, sl: d.sl, best: d.best, time: d.time };
+      await pool.query(`insert into live_decisions (date, symbol, kind, payload) values ($1, $2, 'TRAIL', $3)`, [d.date, d.symbol, JSON.stringify(payload)]);
+    }
   }
 }
 
