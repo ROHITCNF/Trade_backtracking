@@ -193,7 +193,7 @@ export default function LiveTrade({ row, chart, window: win, onWindow, nav, narr
 
       <div className="live-grid">
         <Cell label="Entry" value={`${t.entryTime} · ${price(t.entry)}`} />
-        <Cell label="Stop loss" value={trail && t.sl !== startSl(t) ? `${price(startSl(t))} → ${price(t.sl)}` : price(t.sl)} className="loss" />
+        <Cell label={trail && t.sl !== startSl(t) ? `Stop · from ${price(startSl(t))}` : 'Stop loss'} value={price(t.sl)} className="loss" />
         <Cell label="Target" value={trail ? 'None · trailing' : price(t.target)} className="profit" />
         <Cell label="Exit" value={t.status === 'open' ? 'Open' : `${t.exitTime} · ${price(t.exit)}`} />
         <Cell label="Qty" value={qty(t.quantity)} />

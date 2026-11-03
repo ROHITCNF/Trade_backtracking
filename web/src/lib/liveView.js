@@ -195,6 +195,7 @@ export function tradeStory(trade, candles, orbEnd) {
     events.push({ time: hhmm(candles[0][0]), tone: 'accent', text: `Opening range set by ${orbEnd}: ${price(trade.orbLow)} – ${price(trade.orbHigh)} (${width.toFixed(2)}% wide).` });
   }
   const target = trade.target != null ? `target ${price(trade.target)}` : 'no target';
+  const afterEntry = events.length + 1;
   events.push({ time: trade.entryTime, tone: 'accent', text: `Broke ${long ? 'above' : 'below'} the range at ${price(trade.entry)} → ${long ? 'Long' : 'Short'} ${trade.quantity} · SL ${price(startSl(trade))} · ${target}.` });
 
   const ex = excursions(trade, candles);
@@ -211,8 +212,12 @@ export function tradeStory(trade, candles, orbEnd) {
       text: `Best move ${price(best.price)} (${rMultiple(best.r)})${toTarget}. Worst ${price(worst.price)} at ${hhmm(worst.ts)} (${rMultiple(worst.r)}).`,
     });
   }
-  if (trade.flow === 'trail' && trade.sl !== startSl(trade)) {
-    events.push({ time: trade.slTime || '', tone: 'accent', text: `Stop trailed from ${price(startSl(trade))} to ${price(trade.sl)}.` });
+  if (trade.flow === 'trail' && trade.sl !== startSl(trade) && trade.slTime) {
+    events.push({ time: trade.slTime, tone: 'accent', text: `Stop trailed from ${price(startSl(trade))} to ${price(trade.sl)}.` });
+    // The trail's last move can come before the best move: keep time order
+    // after the opening range and the entry.
+    const later = events.splice(afterEntry).sort((a, b) => a.time.localeCompare(b.time));
+    events.push(...later);
   }
   if (trade.status === 'closed') {
     const r = rOf(trade);

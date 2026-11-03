@@ -142,6 +142,13 @@ test('trail R and story use the starting stop; the other flow reads as one line'
   assert.ok(texts.some((x) => /Stop trailed from .*99\.00 to .*100\.50/.test(x)));
   assert.match(texts.at(-1), /^Trailing stop hit/);
 
+  // The stop's last move (09:50) comes before a later best move: time order.
+  const t2 = { ...t, entryTime: '09:40', slTime: '09:50', exitTime: '10:20', entryTs: base + 25 * 60, exitTs: base + 65 * 60 };
+  const bars = [bar(25, 100, 100.2, 99.8, 100), bar(55, 100, 102, 100, 101.5)]; // best at 10:10
+  const story2 = tradeStory({ ...t2, orbHigh: null }, bars, '09:30').events;
+  assert.deepEqual(story2.map((e) => e.time), ['09:40', '09:50', '10:10', '10:20']);
+  assert.match(story2[1].text, /^Stop trailed/);
+
   assert.match(otherFlowText('trail', trade('NSE:A-EQ')), /^Fixed: .*15.* · Target$/);
   assert.equal(otherFlowText('fixed', null), 'Trail: —');
   assert.equal(otherFlowText('fixed', trade('NSE:A-EQ', { status: 'open' })), 'Trail: open');
