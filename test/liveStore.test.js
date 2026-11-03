@@ -135,7 +135,7 @@ test('fixed and trail trades for one symbol and day live side by side (M10)', { 
     await store.logDecision(DATE, { kind: 'TRAIL', symbol: SYM, flow: 'trail', sl: 110, best: 111, time: '10:06' });
     assert.deepEqual((await q()).rows[1], { flow: 'trail', status: 'closed', entry: 102, sl: 102, initial_sl: 100.98, target: null, best: 103.02, reason: 'SL' });
     const log = await pool.query('select kind, payload->>\'flow\' as flow from live_decisions order by id');
-    assert.deepEqual(log.rows.map((r) => `${r.kind}:${r.flow}`), ['ENTRY:null', 'ENTRY:trail', 'ENTRY:trail', 'TRAIL:trail', 'EXIT:null', 'EXIT:trail', 'TRAIL:trail']);
+    assert.deepEqual(log.rows.map((r) => `${r.kind}:${r.flow}`), ['ENTRY:null', 'ENTRY:trail', 'ENTRY:trail', 'TRAIL:trail', 'EXIT:null', 'EXIT:trail', 'TRAIL:null', 'TRAIL:trail']);
   }));
 
 test('a restored open position carries both flows when both are open', { skip: noDb }, () =>
