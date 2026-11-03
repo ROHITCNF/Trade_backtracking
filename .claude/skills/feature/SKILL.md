@@ -47,7 +47,7 @@ Use this body for each issue, written to a temp file and passed with `-F`, never
 ```
 - **small**: `gh issue create -t "<imperative title>" -F <file> -l area:<x> [-m "<open milestone>"]`
 - **large**:
-  1. `gh api repos/ROHITCNF/Trade_backtracking/milestones -f title="M<next> · <name>" -f description="…"`
+  1. `gh api "repos/{owner}/{repo}/milestones" -f title="M<next> · <name>" -f description="…"`
      (the next M-number is one above the highest existing).
   2. Split into issues that **each leave `main` working**: data or API before the UI that uses it,
      and interim routes over half-built screens. Order them, file each into the milestone.
