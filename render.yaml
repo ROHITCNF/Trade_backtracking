@@ -54,6 +54,14 @@ services:
         value: "true"
       - key: LIVE_WATCHLIST # watchlist name the live session trades (D22: ≤100 symbols)
         value: live
+      - key: BREVO_API_KEY # trade emails (api/notify.js, D26); unset = no mail
+        sync: false
+      - key: MAIL_FROM # sender verified in Brevo
+        sync: false
+      - key: MAIL_TO # where trade and EOD mails go
+        sync: false
+      - key: MAIL_WATCHLIST # only trades on this list are mailed
+        value: final
 
   # The React app, built to static files. Every path falls back to index.html
   # so client-side routes survive a reload.
