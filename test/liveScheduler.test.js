@@ -9,7 +9,7 @@ const { config } = require('./helpers');
 const clockAt = (date, hhmm) => (dateToEpoch(date) + toMinutes(hhmm) * 60) * 1000;
 
 // A scheduler with a settable clock and fake sessions that record their lifecycle.
-function harness({ token = true, symbols = ['NSE:A-EQ', 'NSE:B-EQ'], failStart = false, reconciled = [], failReconcile = false } = {}) {
+function harness({ token = true, symbols = ['NSE:A-EQ', 'NSE:B-EQ'], failStart = false, reconciled = [], failReconcile = false, notifier } = {}) {
   const h = { now: clockAt('2026-01-05', '09:00'), token, sessions: [], logs: [], reconciles: [] };
   h.scheduler = createLiveScheduler({
     pool: null,
@@ -17,6 +17,7 @@ function harness({ token = true, symbols = ['NSE:A-EQ', 'NSE:B-EQ'], failStart =
     watchlist: 'core',
     config: config({ sessionEnd: '15:14' }),
     store: {},
+    ...(notifier ? { notifier } : {}),
     hasToken: async () => h.token,
     symbolsFor: async () => symbols,
     now: () => h.now,
@@ -26,8 +27,8 @@ function harness({ token = true, symbols = ['NSE:A-EQ', 'NSE:B-EQ'], failStart =
       h.reconciles.push({ date, symbols: syms });
       if (failReconcile) throw new Error('REST budget spent');
     },
-    createSession: ({ symbols: syms, date }) => {
-      const s = { date, symbols: syms, started: false, stopped: 0, refreshed: 0 };
+    createSession: ({ symbols: syms, date, onDecision }) => {
+      const s = { onDecision, date, symbols: syms, started: false, stopped: 0, refreshed: 0 };
       h.sessions.push(s);
       return {
         start: async () => { if (failStart) throw new Error('boom'); s.started = true; },
@@ -171,4 +172,74 @@ test('refuses a watchlist over the 100-symbol websocket cap', async () => {
   assert.equal(h.sessions.length, 0);
   assert.match(h.scheduler.status().lastError, /101 symbols; the Fyers websocket allows 100/);
   assert.equal(h.logs.filter((m) => /websocket allows/.test(m)).length, 1, 'logged once');
+});
+
+// --- email notifier (#155) ---
+function fakeNotifier(order = []) {
+  const n = { decisions: [], eods: [] };
+  n.onDecision = (date, event) => { n.decisions.push({ date, event }); return Promise.resolve(); };
+  n.endOfDay = async (date) => { n.eods.push(date); order.push('eod'); };
+  return n;
+}
+
+test('a broker event from the session reaches notifier.onDecision with the session date', async () => {
+  const notifier = fakeNotifier();
+  const h = harness({ notifier });
+  await h.at('2026-01-05', '09:10');
+  assert.equal(typeof h.sessions[0].onDecision, 'function');
+  const event = { kind: 'EXIT', symbol: 'NSE:A-EQ', price: 10, pnl: 5 };
+  h.sessions[0].onDecision(event);
+  assert.deepEqual(notifier.decisions, [{ date: '2026-01-05', event }]);
+});
+
+test('the EOD mail is sent once, after the session is stopped', async () => {
+  const order = [];
+  const notifier = fakeNotifier(order);
+  const h = harness({ notifier });
+  await h.at('2026-01-05', '09:10');
+  const stop = h.sessions[0];
+  const origStatus = stop.stopped;
+  assert.equal(origStatus, 0);
+  await h.at('2026-01-05', '15:18');
+  assert.deepEqual(notifier.eods, [], 'not before sessionEnd + grace');
+  await h.at('2026-01-05', '15:19');
+  assert.deepEqual(notifier.eods, ['2026-01-05']);
+  assert.equal(h.sessions[0].stopped, 1, 'session stopped before the mail');
+  await h.at('2026-01-05', '15:30');
+  await h.at('2026-01-05', '16:00');
+  assert.deepEqual(notifier.eods, ['2026-01-05'], 'still once');
+});
+
+test('a session left over from yesterday mails the EOD for its own date', async () => {
+  const notifier = fakeNotifier();
+  const h = harness({ notifier });
+  await h.at('2026-01-05', '15:00');
+  await h.at('2026-01-06', '09:12');
+  assert.deepEqual(notifier.eods, ['2026-01-05']);
+});
+
+test('a restart after the session ended sends no EOD mail', async () => {
+  const notifier = fakeNotifier();
+  const h = harness({ notifier });
+  h.now = clockAt('2026-01-05', '15:30'); // fresh process, past stopAt
+  await h.scheduler.tick();
+  assert.equal(h.sessions.length, 0);
+  assert.deepEqual(notifier.eods, []);
+});
+
+test('shutdown stop() does not send the EOD mail', async () => {
+  const notifier = fakeNotifier();
+  const h = harness({ notifier });
+  await h.at('2026-01-05', '10:00');
+  await h.scheduler.stop();
+  assert.equal(h.sessions[0].stopped, 1);
+  assert.deepEqual(notifier.eods, []);
+});
+
+test('without a notifier the session still runs and ends normally', async () => {
+  const h = harness();
+  await h.at('2026-01-05', '09:10');
+  assert.doesNotThrow(() => h.sessions[0].onDecision?.({ kind: 'EXIT' }));
+  await h.at('2026-01-05', '15:19');
+  assert.equal(h.sessions[0].stopped, 1);
 });

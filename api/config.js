@@ -26,6 +26,12 @@ function loadConfig(env = process.env) {
       enabled: env.LIVE_ENABLED === 'true',
       watchlist: env.LIVE_WATCHLIST || 'live',
     },
+    // Trade emails through Brevo (api/notify.js, D26). Off unless the key and
+    // the recipient are both set.
+    mail:
+      env.BREVO_API_KEY && env.MAIL_TO
+        ? { apiKey: env.BREVO_API_KEY, from: env.MAIL_FROM || env.MAIL_TO, to: env.MAIL_TO, watchlist: env.MAIL_WATCHLIST || 'final' }
+        : null,
   };
 }
 
