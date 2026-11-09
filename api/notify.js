@@ -146,7 +146,7 @@ function createNotifier({ send, loadSymbols, loadTrades, log = () => {} }) {
 async function loadPaperTrades(pool, date) {
   const { rows } = await pool.query(
     `select symbol, flow, status, side, quantity, entry, entry_time as "entryTime", exit, exit_time as "exitTime", reason, pnl
-     from paper_trades where date = $1 order by entry_time, symbol`,
+     from paper_trades where date = $1 order by entry_time, symbol, flow`,
     [date]
   );
   const num = (v) => (v == null ? null : Number(v));

@@ -149,3 +149,21 @@ test('a restored open position carries both flows when both are open', { skip: n
     assert.equal(Number(s.trail.best), 102); // best starts at the entry price
     assert.equal(s.trail.slTime, null); // still the starting stop
   }));
+
+test('loadPaperTrades returns the day with numbers and camelCase times (#155)', { skip: noDb }, () =>
+  withStore(async (store, pool) => {
+    const { loadPaperTrades } = require('../api/notify');
+    await store.logDecision(DATE, entry('NSE:A-EQ'));
+    await store.logDecision(DATE, { ...entry('NSE:A-EQ'), flow: 'trail', target: null });
+    await store.logDecision(DATE, exit('NSE:A-EQ')); // closes fixed only
+    await store.logDecision(DATE, { ...entry('NSE:B-EQ'), time: '09:45' }); // still open
+    await store.logDecision('2026-01-06', entry('NSE:C-EQ')); // another day
+
+    const rows = await loadPaperTrades(pool, DATE);
+    const pick = ({ symbol, flow, status, entry, entryTime, exit, exitTime, reason, pnl }) => ({ symbol, flow, status, entry, entryTime, exit, exitTime, reason, pnl });
+    assert.deepEqual(rows.map(pick), [
+      { symbol: 'NSE:A-EQ', flow: 'fixed', status: 'closed', entry: 102, entryTime: '09:31', exit: 100.98, exitTime: '09:40', reason: 'SL', pnl: -5.1 },
+      { symbol: 'NSE:A-EQ', flow: 'trail', status: 'open', entry: 102, entryTime: '09:31', exit: null, exitTime: null, reason: null, pnl: null },
+      { symbol: 'NSE:B-EQ', flow: 'fixed', status: 'open', entry: 102, entryTime: '09:45', exit: null, exitTime: null, reason: null, pnl: null },
+    ]);
+  }));

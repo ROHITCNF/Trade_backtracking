@@ -119,8 +119,9 @@ under **Senders, domains & dedicated IPs → Senders**, create a key under **SMT
 keys**, then set the four variables above on the API service.
 
 A failed send is logged (`mail: … failed`) and never affects the session. Only the process that
-hosted the session sends the end-of-day mail, so a restart after the close doesn't resend it,
-and a restart between 15:14 and the session's stop skips it that day.
+hosted the session sends the end-of-day mail, so a restart after the close doesn't resend it.
+A restart before ~15:19 resumes the session and still sends it; it is skipped only if the
+instance is down when the session stops.
 
 ### Rules
 
