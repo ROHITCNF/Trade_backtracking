@@ -98,7 +98,7 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
     // The last trading day without a holiday calendar: the newest day with a
     // paper trade. The Live page opens on it.
     const { rows } = await db.query('select max(date)::text as d from paper_trades where date <= $1', [today]);
-    return { ...live, tokenConnected: connected, today, lastTradeDate: rows[0].d };
+    return { ...live, tokenConnected: connected, mail: Boolean(app.notifier), today, lastTradeDate: rows[0].d };
   });
 
   app.get(
@@ -175,6 +175,26 @@ async function liveRoutes(app, { tokenStatus = fyers.tokenStatus, getCandles = f
         if (/No Fyers token/.test(err.message)) throw httpError(409, 'Connect Fyers to reconcile.');
         if (/REST budget|429/.test(err.message)) throw httpError(503, err.message);
         throw err;
+      }
+    }
+  );
+
+  // Mails the day's report by hand (#157): the same mail as the automatic EOD
+  // one, for whatever has closed so far. Any day, also mid-session.
+  app.post(
+    '/api/paper-trades/:date/mail',
+    { schema: { params: { type: 'object', properties: { date: DATE } } } },
+    async (request, reply) => {
+      if (!app.notifier) throw httpError(409, 'Mail isn’t set up.');
+      const { date } = request.params;
+      try {
+        return { date, trades: await app.notifier.sendDay(date) };
+      } catch (err) {
+        // Brevo's own answer (bad key, unverified sender) is safe and useful to
+        // show; anything else (pg) may carry secrets, so stays generic (NFR-10).
+        request.log.error({ err }, 'mail report failed');
+        const shown = /^Brevo \d{3}/.test(err.message) ? err.message : 'see the API logs';
+        return reply.code(502).send({ error: `Mail failed: ${shown}` });
       }
     }
   );

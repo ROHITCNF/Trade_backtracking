@@ -14,12 +14,13 @@ const config = loadConfig({ DATABASE_URL: 'x', APP_PASSWORD_HASH: 'h', SESSION_S
 const headers = { authorization: `Bearer ${signSession(config.sessionSecret).token}` };
 const tokenStatus = async () => ({ connected: true, expiresAt: 1 });
 
-async function withApi(fn, { live = null, getCandles } = {}) {
+async function withApi(fn, { live = null, getCandles, notifier = null } = {}) {
   const db = await createTestDb();
-  const app = buildApp({ pool: db.pool, config, live, tokenStatus, getCandles });
+  const app = buildApp({ pool: db.pool, config, live, tokenStatus, getCandles, notifier });
   const call = (url, auth = headers) => app.inject({ method: 'GET', url, headers: auth });
+  const post = (url, auth = headers) => app.inject({ method: 'POST', url, headers: auth });
   try {
-    await fn({ call, pool: db.pool });
+    await fn({ call, post, pool: db.pool });
   } finally {
     await app.close();
     await db.drop();
@@ -196,3 +197,40 @@ test('paper trades filter by flow, fixed by default (M10)', { skip: noDb }, () =
 
     assert.equal((await call(`/api/paper-trades?flow=both`)).statusCode, 400);
   }));
+
+// The Mail report button (#157).
+test('mail report: 409 when mail is off, and status says so', { skip: noDb }, () =>
+  withApi(async ({ call, post }) => {
+    assert.equal((await call('/api/live/status')).json().mail, false);
+    const res = await post('/api/paper-trades/2026-01-05/mail');
+    assert.equal(res.statusCode, 409);
+    assert.match(res.json().error, /set up/);
+    assert.equal((await post('/api/paper-trades/2026-01-05/mail', {})).statusCode, 401);
+  }));
+
+test('mail report sends the day and returns the count', { skip: noDb }, () => {
+  const sent = [];
+  const notifier = { sendDay: async (date) => { sent.push(date); return 3; } };
+  return withApi(async ({ call, post }) => {
+    assert.equal((await call('/api/live/status')).json().mail, true);
+    const res = await post('/api/paper-trades/2026-01-05/mail');
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), { date: '2026-01-05', trades: 3 });
+    assert.deepEqual(sent, ['2026-01-05']);
+    assert.equal((await post('/api/paper-trades/not-a-date/mail')).statusCode, 400);
+  }, { notifier });
+});
+
+test('mail report: a Brevo failure is a 502 with its message; anything else stays generic', { skip: noDb }, async () => {
+  const failWith = (message) => ({ sendDay: async () => { throw new Error(message); } });
+  await withApi(async ({ post }) => {
+    const res = await post('/api/paper-trades/2026-01-05/mail');
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.json().error, 'Mail failed: Brevo 401: key not found');
+  }, { notifier: failWith('Brevo 401: key not found') });
+  await withApi(async ({ post }) => {
+    const res = await post('/api/paper-trades/2026-01-05/mail');
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.json().error, 'Mail failed: see the API logs');
+  }, { notifier: failWith('connect ECONNREFUSED postgres://user:secret@host') });
+});

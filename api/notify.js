@@ -128,18 +128,26 @@ function createNotifier({ send, loadSymbols, loadTrades, log = () => {} }) {
     }
   }
 
+  // The day's report: the list's closed fixed trades so far. Throws on failure,
+  // for the Live page's Mail report button (#157); returns the count mailed.
+  async function sendDay(date) {
+    const symbols = new Set(await loadSymbols());
+    const trades = (await loadTrades(date)).filter((t) => flowOf(t) === 'fixed' && t.status === 'closed' && symbols.has(t.symbol));
+    await send(eodMail(date, trades));
+    return trades.length;
+  }
+
+  // The automatic one, when the session stops: never rejects.
   async function endOfDay(date) {
     try {
-      const symbols = new Set(await loadSymbols());
-      const trades = (await loadTrades(date)).filter((t) => flowOf(t) === 'fixed' && t.status === 'closed' && symbols.has(t.symbol));
-      await send(eodMail(date, trades));
-      log(`EOD mail sent for ${date} (${trades.length} trades)`);
+      const n = await sendDay(date);
+      log(`EOD mail sent for ${date} (${n} trades)`);
     } catch (err) {
       log(`EOD mail failed: ${err.message}`);
     }
   }
 
-  return { onDecision, endOfDay };
+  return { onDecision, endOfDay, sendDay };
 }
 
 // paper_trades rows for a day, numbers as numbers (pg returns numeric as strings).

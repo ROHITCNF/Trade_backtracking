@@ -16,12 +16,13 @@ const { watchlistRoutes } = require('./routes/watchlists');
 const { liveRoutes } = require('./routes/live');
 
 // Builds the app without listening, so tests can drive it with app.inject().
-function buildApp({ pool, config, worker = null, symbols = null, live = null, logger = false, loginLimiter, newFyersClient, getCandles, tokenStatus }) {
+function buildApp({ pool, config, worker = null, symbols = null, live = null, notifier = null, logger = false, loginLimiter, newFyersClient, getCandles, tokenStatus }) {
   const app = Fastify({ logger, trustProxy: config.production });
   app.decorate('db', pool);
   app.decorate('worker', worker);
   app.decorate('symbols', symbols);
   app.decorate('live', live);
+  app.decorate('notifier', notifier); // trade emails (api/notify.js); null when mail is off
   app.setErrorHandler(errorHandler);
   app.setNotFoundHandler(notFoundHandler);
 
@@ -82,7 +83,7 @@ async function start() {
     : null;
   console.log(mail ? `mail: on, watchlist "${mail.watchlist}"` : 'mail: off (set BREVO_API_KEY and MAIL_TO)');
   const live = createLiveScheduler({ pool, ...config.live, notifier });
-  const app = buildApp({ pool, config, worker, symbols, live, logger: true });
+  const app = buildApp({ pool, config, worker, symbols, live, notifier, logger: true });
   await app.listen({ port: config.port, host: config.host });
   worker.wake();
   live.start();
