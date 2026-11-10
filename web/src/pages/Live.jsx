@@ -228,6 +228,7 @@ export default function Live() {
   // Mails the day's report (#157): the range's last day, the same mail as the EOD one.
   async function mailReport() {
     setMailing('sending');
+    setError(null);
     try {
       await api(`/api/paper-trades/${to}/mail`, { method: 'POST' });
       setMailing(to);
@@ -331,7 +332,7 @@ export default function Live() {
         </div>
         <Segmented label="Flow" value={flow} options={FLOWS} onChange={pickFlow} />
         <button className="btn" onClick={mailReport} disabled={!status.mail || mailing === 'sending'}
-          title={status.mail ? `Mail the ${to} report (the mail list’s fixed trades)` : 'Mail isn’t set up: set BREVO_API_KEY and MAIL_TO on the API'}>
+          title={status.mail ? `Mail the ${to} report: Fixed trades on the mail list (MAIL_WATCHLIST, default final)` : 'Mail isn’t set up: set BREVO_API_KEY and MAIL_TO on the API'}>
           {mailing === 'sending' ? 'Sending…' : mailing === to ? `Sent ${to}` : 'Mail report'}
         </button>
         <button className="btn" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
