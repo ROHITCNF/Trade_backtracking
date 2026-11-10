@@ -74,3 +74,18 @@ test.describe('phone width', () => {
     await shot('live-trail-phone');
   });
 });
+
+// Mail report (#157). The stub API's notifier sends nothing; it answers with
+// the day's closed fixed-trade count.
+test('Live mails the day report from the Mail report button', async ({ page, signIn, shot }) => {
+  await signIn();
+  await page.locator('nav').getByRole('link', { name: 'Live' }).click();
+  await expect(page.getByRole('heading', { name: 'Live paper' })).toBeVisible();
+  const button = page.getByRole('button', { name: 'Mail report' });
+  await expect(button).toBeEnabled();
+  const sent = page.waitForResponse((r) => /\/api\/paper-trades\/\d{4}-\d{2}-\d{2}\/mail$/.test(r.url()) && r.request().method() === 'POST');
+  await button.click();
+  expect((await sent).status()).toBe(200);
+  await expect(page.getByRole('button', { name: /^Sent \d{4}-\d{2}-\d{2}$/ })).toBeVisible();
+  await shot('live-mail-sent');
+});

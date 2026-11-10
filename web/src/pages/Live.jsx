@@ -81,6 +81,7 @@ export default function Live() {
   const [custom, setCustom] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [mailing, setMailing] = useState(null); // null | 'sending' | the date last mailed
   const [tab, setTab] = useState('traded');
   const [sortBy, setSortBy] = useState('time');
   const [selected, setSelected] = useState(null);
@@ -224,6 +225,18 @@ export default function Live() {
     setRefreshing(false);
   }
 
+  // Mails the day's report (#157): the range's last day, the same mail as the EOD one.
+  async function mailReport() {
+    setMailing('sending');
+    try {
+      await api(`/api/paper-trades/${to}/mail`, { method: 'POST' });
+      setMailing(to);
+    } catch (err) {
+      setError(err.message);
+      setMailing(null);
+    }
+  }
+
   async function recheck() {
     setRechecking(true);
     try {
@@ -317,6 +330,10 @@ export default function Live() {
           <p className="page-sub">{head.line}</p>
         </div>
         <Segmented label="Flow" value={flow} options={FLOWS} onChange={pickFlow} />
+        <button className="btn" onClick={mailReport} disabled={!status.mail || mailing === 'sending'}
+          title={status.mail ? `Mail the ${to} report (the mail list’s fixed trades)` : 'Mail isn’t set up: set BREVO_API_KEY and MAIL_TO on the API'}>
+          {mailing === 'sending' ? 'Sending…' : mailing === to ? `Sent ${to}` : 'Mail report'}
+        </button>
         <button className="btn" onClick={refresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
       </div>
 
