@@ -201,3 +201,25 @@ test('endOfDay does not reject when loading trades fails', async () => {
   const h = notifierHarness({ failLoad: true });
   await assert.doesNotReject(() => h.notifier.endOfDay(DATE));
 });
+
+test('sendDay mails the list\'s closed fixed trades so far, returns the count, and throws on failure (#157)', async () => {
+  const rows = [
+    { symbol: 'NSE:LUPIN-EQ', flow: 'fixed', status: 'closed', side: 'long', quantity: 5, entry: 100, entryTime: '09:31', exit: 101, exitTime: '10:00', reason: 'TARGET', pnl: 5 },
+    { symbol: 'NSE:LUPIN-EQ', flow: 'trail', status: 'closed', side: 'long', quantity: 5, entry: 100, entryTime: '09:31', exit: 102, exitTime: '11:00', reason: 'SL', pnl: 10 },
+    { symbol: 'NSE:OIL-EQ', flow: 'fixed', status: 'open', side: 'short', quantity: 3, entry: 50, entryTime: '09:40', exit: null, exitTime: null, reason: null, pnl: null },
+    { symbol: 'NSE:SBIN-EQ', flow: 'fixed', status: 'closed', side: 'long', quantity: 1, entry: 800, entryTime: '09:35', exit: 790, exitTime: '09:50', reason: 'SL', pnl: -10 },
+  ];
+  const mails = [];
+  const notifier = createNotifier({
+    send: async (m) => { mails.push(m); },
+    loadSymbols: async () => ['NSE:LUPIN-EQ', 'NSE:OIL-EQ'],
+    loadTrades: async () => rows,
+  });
+  assert.equal(await notifier.sendDay(DATE), 1);
+  assert.equal(mails.length, 1);
+  assert.ok(mails[0].html.includes('LUPIN'));
+  assert.ok(!mails[0].html.includes('SBIN'));
+
+  const failing = createNotifier({ send: async () => { throw new Error('Brevo 401: nope'); }, loadSymbols: async () => [], loadTrades: async () => [] });
+  await assert.rejects(failing.sendDay(DATE), /Brevo 401/);
+});

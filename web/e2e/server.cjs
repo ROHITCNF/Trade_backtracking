@@ -201,7 +201,13 @@ async function main() {
     SESSION_SECRET: crypto.randomBytes(32).toString('hex'),
   });
   const worker = createWorker({ pool, getCandles, log: () => {} });
-  app = buildApp({ pool, config, worker, symbols, getCandles });
+  // Mail never leaves the machine: the Mail report button gets a stub that
+  // counts the day's closed fixed trades and sends nothing.
+  const notifier = {
+    sendDay: async (date) =>
+      (await pool.query("select count(*)::int as n from paper_trades where date = $1 and flow = 'fixed' and status = 'closed'", [date])).rows[0].n,
+  };
+  app = buildApp({ pool, config, worker, symbols, getCandles, notifier });
   await app.listen({ port: PORT, host: '127.0.0.1' });
   worker.wake();
   console.log(`e2e api on :${PORT}, database ${name}, password ${PASSWORD}`);

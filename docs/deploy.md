@@ -118,7 +118,8 @@ Mail goes through Brevo's HTTPS API, because Render's free plan blocks SMTP. Set
 under **Senders, domains & dedicated IPs → Senders**, create a key under **SMTP & API → API
 keys**, then set the four variables above on the API service.
 
-A failed send is logged (`mail: … failed`) and never affects the session. Only the process that
+The Live page's **Mail report** button sends the same report for the page's date at any time
+(disabled while mail is off). A failed send is logged (`mail: … failed`) and never affects the session. Only the process that
 hosted the session sends the end-of-day mail, so a restart after the close doesn't resend it.
 A restart before ~15:19 resumes the session and still sends it; it is skipped only if the
 instance is down when the session stops.
