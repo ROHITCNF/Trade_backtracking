@@ -59,7 +59,8 @@ async function start() {
   const { createWorker } = require('./worker');
   const { createSymbolMaster } = require('./symbols');
   const { seedWatchlists } = require('./db/watchlists');
-  const { createLiveScheduler } = require('./live');
+  const { createLiveScheduler, loadWatchlist } = require('./live');
+  const { createNotifier, createBrevoSender, loadPaperTrades } = require('./notify');
 
   const pool = getPool();
   await migrate(pool);
@@ -70,7 +71,17 @@ async function start() {
   const worker = createWorker({ pool });
   const symbols = createSymbolMaster();
   symbols.start(); // not awaited: boot does not wait on Fyers' file server
-  const live = createLiveScheduler({ pool, ...config.live });
+  const { mail } = config;
+  const notifier = mail
+    ? createNotifier({
+        send: createBrevoSender(mail),
+        loadSymbols: () => loadWatchlist(pool, mail.watchlist),
+        loadTrades: (date) => loadPaperTrades(pool, date),
+        log: (msg) => console.log(`mail: ${msg}`),
+      })
+    : null;
+  console.log(mail ? `mail: on, watchlist "${mail.watchlist}"` : 'mail: off (set BREVO_API_KEY and MAIL_TO)');
+  const live = createLiveScheduler({ pool, ...config.live, notifier });
   const app = buildApp({ pool, config, worker, symbols, live, logger: true });
   await app.listen({ port: config.port, host: config.host });
   worker.wake();

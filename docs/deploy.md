@@ -68,6 +68,10 @@ No orders are placed. The live session is hosted by the API itself
 |---|---|---|
 | `LIVE_ENABLED` | `true` | turns the scheduler on; anything else leaves it off |
 | `LIVE_WATCHLIST` | `live` | name of the list it trades; at most 100 symbols, the Fyers Standard websocket cap (decisions.md D22) |
+| `BREVO_API_KEY` | from Brevo | turns trade emails on (with `MAIL_TO`); see § Trade emails |
+| `MAIL_FROM` | your verified sender | the From address; defaults to `MAIL_TO` |
+| `MAIL_TO` | your email | where the mails go |
+| `MAIL_WATCHLIST` | `final` | only trades on this list are mailed (D26) |
 
 ### Keep the free instance awake
 
@@ -99,6 +103,25 @@ Connecting Fyers late is fine: the session starts within 30 s of the token
 arriving, and warm start recovers the candles it missed. A Render restart or
 deploy mid-session is also fine: positions come back from `live_state`, so
 nothing is entered twice.
+
+### Trade emails
+
+With `BREVO_API_KEY` and `MAIL_TO` set, the API mails (decisions.md D26):
+
+- one email each time a **fixed** paper trade on `MAIL_WATCHLIST` closes (stop, target or EOD):
+  symbol, side, entry, exit, reason and net P&L;
+- one end-of-day email, about 15:19 when the session stops: today's P&L, trades taken,
+  wins/losses, win rate and a row per trade. A day without trades still sends one.
+
+Mail goes through Brevo's HTTPS API, because Render's free plan blocks SMTP. Setup, free
+(300 mails/day): sign up at [brevo.com](https://www.brevo.com), add and verify your email
+under **Senders, domains & dedicated IPs → Senders**, create a key under **SMTP & API → API
+keys**, then set the four variables above on the API service.
+
+A failed send is logged (`mail: … failed`) and never affects the session. Only the process that
+hosted the session sends the end-of-day mail, so a restart after the close doesn't resend it.
+A restart before ~15:19 resumes the session and still sends it; it is skipped only if the
+instance is down when the session stops.
 
 ### Rules
 

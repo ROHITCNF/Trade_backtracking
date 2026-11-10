@@ -6,7 +6,8 @@
 // Every check is idempotent: a restart mid-session simply starts a new session,
 // which restores its positions from Postgres and backfills today's candles.
 // After the session ends, the day is reconciled once against a backtest
-// (api/reconcile.js).
+// (api/reconcile.js). An optional notifier (api/notify.js) mails each closed
+// trade and, once the session has ended, the day's summary (D26).
 
 const baseConfig = require('../config');
 const { createLiveSession } = require('../server/session');
@@ -48,6 +49,7 @@ function createLiveScheduler({
   isReconciled = async (date) => (await pool.query('select 1 from paper_reconciliations where date = $1', [date])).rows.length > 0,
   now = () => Date.now(),
   intervalMs = 30000,
+  notifier = null,
   log = (msg) => console.log(`live: ${msg}`),
 }) {
   const stopAt = toMinutes(config.sessionEnd) + STOP_GRACE_MIN;
@@ -67,7 +69,11 @@ function createLiveScheduler({
       log(`end-of-day refresh failed: ${err.message}`);
     }
     await ending.stop();
-    log(`session ${ending.status().date} stopped`);
+    const { date } = ending.status();
+    log(`session ${date} stopped`);
+    // Only a process that hosted the session gets here, so a restart after the
+    // session has ended never mails the summary twice.
+    if (notifier) await notifier.endOfDay(date);
   }
 
   async function check() {
@@ -102,7 +108,8 @@ function createLiveScheduler({
       return;
     }
 
-    const next = createSession({ symbols, config, store, date, log: (msg) => log(msg) });
+    const onDecision = notifier ? { onDecision: (event) => notifier.onDecision(date, event) } : {};
+    const next = createSession({ symbols, config, store, date, ...onDecision, log: (msg) => log(msg) });
     try {
       await next.start();
       session = next;
