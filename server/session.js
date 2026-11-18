@@ -431,4 +431,4 @@ function createLiveSession({
   return { start, stop, refresh, status: getStatus, onTick };
 }
 
-module.exports = { createLiveSession, tickExit, candleExit };
+module.exports = { createLiveSession, tickExit, candleExit, pnlOf };
