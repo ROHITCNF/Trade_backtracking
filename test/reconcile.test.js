@@ -61,6 +61,14 @@ test('compare: match, tick order, or mismatch', () => {
   assert.equal(kind(live, { ...bt, side: 'short', entryTime: '09:31' }, both), 'tick');
 });
 
+test('compare: EOD on both sides is a match, live at 15:10 and the backtest at 15:09 (D27)', () => {
+  const bt = { side: 'long', entryTime: '09:31', exitTime: '15:09', reason: 'EOD', sl: 99, target: 103 };
+  const live = { side: 'long', status: 'closed', entry_time: '09:31', exit_time: '15:10', reason: 'EOD' };
+  assert.deepEqual(compare(live, bt), { kind: 'match' });
+  assert.deepEqual(compare({ ...live, exit_time: '15:11' }, bt), { kind: 'match' });
+  assert.equal(compare({ ...live, reason: 'SL', exit_time: '15:05' }, bt).kind, 'mismatch');
+});
+
 test('a day where live matches the backtest reconciles clean', { skip: noDb }, () =>
   withDb(async (pool, store) => {
     await recordLive(store, btA);
