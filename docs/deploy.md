@@ -96,7 +96,7 @@ no background workers or cron, so an outside service does the waking:
 | before 09:15 | **you** sign in and click Connect Fyers; the token dies at 06:30 every morning |
 | 09:10 → | with a token, the session starts: warm start pulls today's candles (~39 calls), then the websocket |
 | 09:15–15:09 | breakouts, stops and targets are written to `paper_trades` as the engine decides them |
-| 15:10 | at 15:10:00 every open trade closes as EOD at its last price, tick or no tick (D27, #160) |
+| 15:10 | at 15:10:00 every open trade closes as EOD at its last price, tick or no tick, while the feed is live; if it is down or silent, the 15:15 refresh closes them from REST candles (D27, #160) |
 | 15:15 | end-of-day REST pull books EOD exits (15:09 close) for anything still held, the session stops |
 | 15:15–15:50 | once per day: reconcile against a backtest (~39 calls); a day with no session is backfilled |
 
