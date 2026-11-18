@@ -9,8 +9,8 @@ const { config } = require('./helpers');
 const clockAt = (date, hhmm) => (dateToEpoch(date) + toMinutes(hhmm) * 60) * 1000;
 
 // A scheduler with a settable clock and fake sessions that record their lifecycle.
-function harness({ token = true, symbols = ['NSE:A-EQ', 'NSE:B-EQ'], failStart = false, reconciled = [], failReconcile = false, notifier } = {}) {
-  const h = { now: clockAt('2026-01-05', '09:00'), token, sessions: [], logs: [], reconciles: [] };
+function harness({ token = true, symbols = ['NSE:A-EQ', 'NSE:B-EQ'], failStart = false, reconciled = [], failReconcile = false, notifier, catchUp } = {}) {
+  const h = { now: clockAt('2026-01-05', '09:00'), token, sessions: [], logs: [], reconciles: [], catchUps: [], order: [] };
   h.scheduler = createLiveScheduler({
     pool: null,
     enabled: true,
@@ -23,8 +23,14 @@ function harness({ token = true, symbols = ['NSE:A-EQ', 'NSE:B-EQ'], failStart =
     now: () => h.now,
     log: (msg) => h.logs.push(msg),
     isReconciled: async (date) => reconciled.includes(date),
+    catchUp: async (args) => {
+      h.catchUps.push(args);
+      h.order.push('catchUp');
+      return catchUp ? catchUp(args, h) : { closed: 0, left: 0 };
+    },
     reconcile: async ({ date, symbols: syms }) => {
       h.reconciles.push({ date, symbols: syms });
+      h.order.push('reconcile');
       if (failReconcile) throw new Error('REST budget spent');
     },
     createSession: ({ symbols: syms, date, onDecision }) => {
@@ -242,4 +248,63 @@ test('without a notifier the session still runs and ends normally', async () => 
   assert.doesNotThrow(() => h.sessions[0].onDecision?.({ kind: 'EXIT' }));
   await h.at('2026-01-05', '15:19');
   assert.equal(h.sessions[0].stopped, 1);
+});
+
+// #161: trades a sleeping instance left open.
+
+test('a fresh instance waking after the close runs catch-up before reconcile', async () => {
+  const h = harness();
+  await h.at('2026-01-05', '19:22'); // asleep through the whole session
+  assert.equal(h.sessions.length, 0);
+  assert.deepEqual(h.order, ['catchUp', 'reconcile']);
+  assert.equal(h.catchUps[0].now(), clockAt('2026-01-05', '19:22'));
+});
+
+test('catch-up runs after the hosted session stops, then reconcile', async () => {
+  const h = harness();
+  await h.at('2026-01-05', '09:10');
+  await h.at('2026-01-05', '15:19');
+  assert.equal(h.sessions[0].stopped, 1);
+  assert.deepEqual(h.order, ['catchUp', 'reconcile']);
+});
+
+test('catch-up waits for a token, and never runs during the session', async () => {
+  const h = harness({ token: false });
+  await h.at('2026-01-05', '19:22');
+  assert.deepEqual(h.order, []);
+  h.token = true;
+  await h.at('2026-01-05', '12:00'); // in window: a session starts, no catch-up
+  assert.equal(h.catchUps.length, 0);
+});
+
+test('once nothing is left open, catch-up rests until the next close', async () => {
+  const h = harness();
+  await h.at('2026-01-05', '19:22');
+  await h.at('2026-01-05', '20:00');
+  await h.at('2026-01-05', '21:00');
+  assert.equal(h.catchUps.length, 1);
+});
+
+test('a catch-up that leaves trades open retries every 10 minutes; reconcile still runs once', async () => {
+  const h = harness({ catchUp: () => ({ closed: 0, left: 2 }) });
+  await h.at('2026-01-05', '19:22');
+  await h.at('2026-01-05', '19:25');
+  assert.equal(h.catchUps.length, 1, 'not before 10 minutes');
+  await h.at('2026-01-05', '19:33');
+  assert.equal(h.catchUps.length, 2);
+  assert.equal(h.reconciles.length, 1);
+});
+
+test('a catch-up that throws is logged and does not stop reconcile', async () => {
+  const h = harness({ catchUp: () => { throw new Error('db down'); } });
+  await h.at('2026-01-05', '19:22');
+  assert.ok(h.logs.some((l) => /catch-up failed: db down/.test(l)));
+  assert.equal(h.reconciles.length, 1);
+});
+
+test('catch-up also runs before the session on a weekend, for earlier days', async () => {
+  const h = harness();
+  await h.at('2026-01-10', '11:00'); // Saturday
+  assert.equal(h.catchUps.length, 1);
+  assert.equal(h.reconciles.length, 0);
 });

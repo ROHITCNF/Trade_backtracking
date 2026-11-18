@@ -13,11 +13,13 @@ const baseConfig = require('../config');
 const { createLiveSession } = require('../server/session');
 const { createLiveStore } = require('./db/liveStore');
 const { reconcileDay } = require('./reconcile');
+const { closeStaleTrades } = require('./catchup');
 const { readToken } = require('../src/fyers');
 const { istParts, toMinutes, IST_OFFSET_SECONDS } = require('../src/time');
 
 const START_AT = toMinutes('09:10'); // early enough to connect before the 09:15 open
 const STOP_GRACE_MIN = 5; // after sessionEnd, so the last minute's candle exists over REST
+const CATCH_UP_RETRY_MS = 10 * 60 * 1000; // a failed catch-up (no candles) retries this often
 // Fyers Standard allows 100 data-websocket symbols per account, across every
 // connection (D22). Over it the subscription fails, so refuse up front.
 const MAX_SYMBOLS = 100;
@@ -47,6 +49,7 @@ function createLiveScheduler({
   createSession = createLiveSession,
   reconcile = (args) => reconcileDay({ pool, ...args }),
   isReconciled = async (date) => (await pool.query('select 1 from paper_reconciliations where date = $1', [date])).rows.length > 0,
+  catchUp = (args) => closeStaleTrades({ pool, ...args }),
   now = () => Date.now(),
   intervalMs = 30000,
   notifier = null,
@@ -59,6 +62,9 @@ function createLiveScheduler({
   let waiting = null; // the date we last logged "waiting for a token", so it logs once a day
   let lastError = null;
   let reconciledFor = null; // the date already reconciled, so the check runs once a day
+  let caughtUp = null; // '<date>:<before|after>' once nothing was left open, so it stops until the next key
+  let triedAfterClose = null; // the date catch-up has run for after its close, so reconcile may follow
+  let catchUpAt = -Infinity; // when catch-up last ran, so a failing one retries every 10 minutes
 
   async function endSession() {
     const ending = session;
@@ -84,7 +90,10 @@ function createLiveScheduler({
     if (session && (session.status().date !== date || !inWindow)) await endSession();
     if (session) return;
     if (!inWindow) {
-      if (isWeekday(nowSec) && minute >= stopAt) await reconcileOnce(date);
+      // Trades a sleeping instance left open close before the day is
+      // reconciled, so reconcile sees them closed (#161).
+      await catchUpOnce(date, minute >= stopAt);
+      if (isWeekday(nowSec) && minute >= stopAt && triedAfterClose === date) await reconcileOnce(date);
       return;
     }
 
@@ -120,6 +129,29 @@ function createLiveScheduler({
       await next.stop().catch(() => {});
       lastError = err.message;
       log(`session start failed: ${err.message}`);
+    }
+  }
+
+  // Closes paper trades left open on any finished day (api/catchup.js). One
+  // REST call per stuck symbol, so it waits for a token. Once nothing is left
+  // it rests until the next key: today's close, then tomorrow. A run that
+  // leaves something open (no candles yet, budget spent) retries every 10 min;
+  // reconcile follows the first run after the close either way, so one symbol
+  // with no candles can't hold it back.
+  async function catchUpOnce(date, afterClose) {
+    const key = `${date}:${afterClose ? 'after' : 'before'}`;
+    if (caughtUp === key || now() - catchUpAt < CATCH_UP_RETRY_MS) return;
+    if (!(await hasToken())) return;
+    catchUpAt = now();
+    try {
+      const { closed, left } = await catchUp({ config, now, log });
+      if (closed || left) log(`catch-up: closed ${closed}, left open ${left}`);
+      if (!left) caughtUp = key;
+    } catch (err) {
+      lastError = `catch-up failed: ${err.message}`;
+      log(lastError);
+    } finally {
+      if (afterClose) triedAfterClose = date;
     }
   }
 

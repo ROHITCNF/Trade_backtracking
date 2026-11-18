@@ -98,7 +98,8 @@ no background workers or cron, so an outside service does the waking:
 | 09:15–15:09 | breakouts, stops and targets are written to `paper_trades` as the engine decides them |
 | 15:10 | at 15:10:00 every open trade closes as EOD at its last price, tick or no tick, while the feed is live; if it is down or silent, the 15:15 refresh closes them from REST candles (D27, #160) |
 | 15:15 | end-of-day REST pull books EOD exits (15:09 close) for anything still held, the session stops |
-| 15:15–15:50 | once per day: reconcile against a backtest (~39 calls); a day with no session is backfilled |
+| after 15:15, any check | catch-up: any paper trade still open from a finished day (the instance slept through the close) is booked EOD at its 15:09 close, no replay of the slept minutes (D27, #161) |
+| 15:15–15:50 | once per day, after catch-up: reconcile against a backtest (~39 calls); a day with no session is backfilled |
 
 Connecting Fyers late is fine: the session starts within 30 s of the token
 arriving, and warm start recovers the candles it missed. A Render restart or

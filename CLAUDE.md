@@ -146,7 +146,8 @@ place the entry rules and levels live; see `server/architecture.md` before touch
 
 The deployed API hosts the same session (`server/session.js` via `api/live.js`, on when
 `LIVE_ENABLED=true`) with state in Postgres (`paper_trades`, `live_state`, `live_decisions`), and
-reconciles each day against a backtest after the close (`api/reconcile.js`). Setup, and the
+reconciles each day against a backtest after the close (`api/reconcile.js`), after closing any paper
+trade an instance that slept through the close left open (`api/catchup.js`, D27). Setup, and the
 cron-job.org pinger that keeps the free Render instance awake: `docs/deploy.md` § Live paper trading.
 
 ## Credentials

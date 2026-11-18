@@ -134,7 +134,7 @@ disk on restart, so:
 
 | piece | file | job |
 |---|---|---|
-| scheduler | `api/live.js` | every 30 s: on a weekday from 09:10 IST to `sessionEnd` + 5 min, with a Fyers token and a non-empty watchlist, start a session; afterwards `refresh()` (EOD exits) and `stop()` |
+| scheduler | `api/live.js` | every 30 s: on a weekday from 09:10 IST to `sessionEnd` + 5 min, with a Fyers token and a non-empty watchlist, start a session; afterwards `refresh()` (EOD exits) and `stop()`. Outside that window, with a token, `api/catchup.js` first books EOD (15:09 close, D27) for any paper trade a sleeping instance left open on a finished day, then the day is reconciled |
 | state store | `api/db/liveStore.js` | `live_state`, `live_decisions`, `paper_trades` in Postgres, same `{ load, save, logDecision }` shape as `state.js` |
 | reconcile | `api/reconcile.js` | once per day after the close: backtest the day on REST candles and diff it against `paper_trades`; on a day with no session, backfill it |
 | routes | `api/routes/live.js` | status, paper trades, decisions, per-trade candles, manual reconcile |
