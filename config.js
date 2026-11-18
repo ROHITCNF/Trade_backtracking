@@ -52,8 +52,10 @@ module.exports = {
   orbStart: "09:15",
   orbEnd: "09:30",
 
-  // Entry allowed from orbEnd. Any open position is closed at sessionEnd.
-  sessionEnd: "15:14",
+  // Entry allowed from orbEnd. sessionEnd is exclusive, like orbEnd (D27): no
+  // entry at or after it, and any open position is closed at the price at
+  // sessionEnd (the close of the candle before it; live: the first tick at it).
+  sessionEnd: "15:10",
 
   // Round-trip cost in basis points (10 = 0.1%). Set 0 to see raw edge.
   costBps: 0,

@@ -182,11 +182,11 @@ test('refresh books the EOD exit of a position held into sessionEnd', async () =
   });
   await session.start();
   // No tick ever arrives after sessionEnd; the end-of-day REST pull carries it.
-  candles = [...candles, candle(DATE, '15:14', 101.6, 101.7, 101.5, 101.6)];
+  candles = [...candles, candle(DATE, '15:09', 101.6, 101.7, 101.5, 101.6), candle(DATE, '15:10', 101.7, 101.7, 101.7, 101.7)];
   await session.refresh();
   await session.stop();
   assert.deepEqual(kinds(store), ['ENTRY', 'EXIT']);
-  assert.equal(store.decisions[1].reason, 'EOD');
+  assert.deepEqual([store.decisions[1].reason, store.decisions[1].price, store.decisions[1].time], ['EOD', 101.6, '15:09']);
   assert.equal(store.state.symbols[SYM].position, 'CLOSED');
 });
 
@@ -233,15 +233,46 @@ test('target first, then stop, in one minute: live keeps the target the backtest
   assert.deepEqual([store.decisions[1].reason, store.decisions[1].price], ['TARGET', 102.05]);
 });
 
+test('a late first tick after sessionEnd still closes a held position as EOD', async () => {
+  const { session, store, feed, settle } = harness();
+  await session.start();
+  feed.onOpen();
+  feed.onTick(SYM, 101.2, at('09:31'));
+  feed.onTick(SYM, 101.6, at('15:08') + 50);
+  feed.onTick(SYM, 101.4, at('15:11') + 5); // illiquid: nothing during 15:10
+  await settle();
+  assert.deepEqual([store.decisions[1].reason, store.decisions[1].price, store.decisions[1].time], ['EOD', 101.4, '15:11']);
+});
+
+test('refresh with the 15:09 candle missing books EOD at the last close before sessionEnd', async () => {
+  let candles = [...openingRange(DATE), candle(DATE, '09:30', 100, 102, 100, 101.5)];
+  const store = memoryStore();
+  const session = createLiveSession({
+    symbols: [SYM],
+    config: config(),
+    store,
+    date: DATE,
+    log: () => {},
+    socketToken: async () => 'app:token',
+    warmStart: async (symbols, onSymbol) => onSymbol(SYM, candles),
+    startFeed: () => ({ close() {} }),
+  });
+  await session.start();
+  candles = [...candles, candle(DATE, '15:07', 101.6, 101.7, 101.5, 101.65), candle(DATE, '15:10', 99, 99, 99, 99)];
+  await session.refresh();
+  await session.stop();
+  assert.deepEqual([store.decisions[1].reason, store.decisions[1].price, store.decisions[1].time], ['EOD', 101.65, '15:07']);
+});
+
 test('the first tick at sessionEnd closes the position as EOD', async () => {
   const { session, store, feed, settle } = harness();
   await session.start();
   feed.onOpen();
   feed.onTick(SYM, 101.2, at('09:31'));
-  feed.onTick(SYM, 101.6, at('15:13') + 50);
-  feed.onTick(SYM, 101.55, at('15:14') + 2);
+  feed.onTick(SYM, 101.6, at('15:09') + 50);
+  feed.onTick(SYM, 101.55, at('15:10') + 2);
   await settle();
-  assert.deepEqual([store.decisions[1].reason, store.decisions[1].price, store.decisions[1].time], ['EOD', 101.55, '15:14']);
+  assert.deepEqual([store.decisions[1].reason, store.decisions[1].price, store.decisions[1].time], ['EOD', 101.55, '15:10']);
 });
 
 test('a restart mid-trade keeps the saved levels and checks the blind minutes on REST candles', async () => {

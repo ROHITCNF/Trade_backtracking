@@ -146,6 +146,19 @@ Live only; the backtest and reconciliation stay on the fixed flow. [decisions.md
 | [#149](https://github.com/ROHITCNF/Trade_backtracking/issues/149) | Live: trailing-stop paper flow beside the fixed flow |
 | [#150](https://github.com/ROHITCNF/Trade_backtracking/issues/150) | Live page: Fixed / Trail toggle with stepped SL |
 
+## M11 · Live EOD hardening
+
+Every paper trade closes at 15:10:00, and none can stay open because the free instance slept
+through the close (2026-11-18: the pinger was disabled, 9 trades stayed open). `sessionEnd`
+becomes exclusive; a trade the instance missed is booked EOD at the 15:09 close, without
+replaying the gap. [decisions.md](decisions.md) D27.
+
+| issue | task |
+|---|---|
+| [#159](https://github.com/ROHITCNF/Trade_backtracking/issues/159) | Close at 15:10:00: sessionEnd becomes an exclusive hard stop |
+| [#160](https://github.com/ROHITCNF/Trade_backtracking/issues/160) | Live: close every open position at 15:10:00 even without a tick |
+| [#161](https://github.com/ROHITCNF/Trade_backtracking/issues/161) | Catch-up close for paper trades a sleeping instance left open |
+
 ## Owner involvement
 
 Only M5 needs the owner:

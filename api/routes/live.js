@@ -45,10 +45,10 @@ function summarize(trades) {
   };
 }
 
-// True once today's session is over (sessionEnd has passed in IST).
+// True once today's session is over (sessionEnd has been reached in IST; it is exclusive, D27).
 const afterClose = (date, now = Date.now()) => {
   const { date: today, minute } = istParts(Math.floor(now / 1000));
-  return date < today || (date === today && minute > toMinutes(baseConfig.sessionEnd));
+  return date < today || (date === today && minute >= toMinutes(baseConfig.sessionEnd));
 };
 
 const daysBefore = (date, n) => istParts(dateToEpoch(date) - n * 86400).date;

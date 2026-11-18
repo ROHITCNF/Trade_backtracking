@@ -6,7 +6,7 @@ import { istParts } from './ist.js';
 import { addDays, addMonths } from './dates.js';
 
 // The API's scheduler starts the session at 09:10 IST and stops it a few
-// minutes after the 15:14 exit; 15:30 matches the market pill.
+// minutes after the 15:10 exit; 15:30 matches the market pill.
 const START = 9 * 60 + 10;
 const CLOSE = 15 * 60 + 30;
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

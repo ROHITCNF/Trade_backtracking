@@ -194,12 +194,12 @@ test('the first tick at sessionEnd closes the trail as EOD, as it does the fixed
   await session.start();
   feed.onOpen();
   feed.onTick(SYM, 100, at('09:31'));
-  feed.onTick(SYM, 100.3, at('15:13') + 50);
-  feed.onTick(SYM, 100.25, at('15:14') + 2);
+  feed.onTick(SYM, 100.3, at('15:09') + 50);
+  feed.onTick(SYM, 100.25, at('15:10') + 2);
   await settle();
   const exits = store.decisions.filter((d) => d.kind === 'EXIT');
   assert.deepEqual(exits.map((d) => [d.flow, d.reason, d.price, d.time]).sort(),
-    [['fixed', 'EOD', 100.25, '15:14'], ['trail', 'EOD', 100.25, '15:14']]);
+    [['fixed', 'EOD', 100.25, '15:10'], ['trail', 'EOD', 100.25, '15:10']]);
   assert.equal(store.state.symbols[SYM].position, 'CLOSED');
 });
 
@@ -213,7 +213,7 @@ test('warm start from candles opens both flows; refresh books EOD for both at th
     startFeed: () => ({ close() {} }),
   });
   await session.start();
-  candles = [...candles, trailCandle('15:14', 100.1, 100.4, 100, 100.3)];
+  candles = [...candles, trailCandle('15:09', 100.1, 100.4, 100, 100.3), trailCandle('15:10', 100.3, 100.3, 100.3, 100.3)];
   await session.refresh();
   await session.stop();
   assert.deepEqual(store.decisions.slice(0, 2).map((d) => [d.kind, d.flow]), [['ENTRY', 'fixed'], ['ENTRY', 'trail']]);
@@ -222,6 +222,24 @@ test('warm start from candles opens both flows; refresh books EOD for both at th
   const exits = store.decisions.filter((d) => d.kind === 'EXIT');
   assert.deepEqual(exits.map((d) => [d.flow, d.reason, d.price]).sort(), [['fixed', 'EOD', 100.3], ['trail', 'EOD', 100.3]]);
   assert.equal(store.state.symbols[SYM].position, 'CLOSED');
+});
+
+test('refresh with the 15:09 candle missing books both flows EOD at the last close before sessionEnd', async () => {
+  let candles = [...LONG_RANGE, trailCandle('09:30', 99.9, 100, 99.8, 99.95)];
+  const store = memoryStore();
+  const session = createLiveSession({
+    symbols: [SYM], config: cfg(), store, date: DATE, log: () => {},
+    socketToken: async () => 'app:token',
+    warmStart: async (symbols, onSymbol) => onSymbol(SYM, candles),
+    startFeed: () => ({ close() {} }),
+  });
+  await session.start();
+  candles = [...candles, trailCandle('15:07', 100.1, 100.2, 100, 100.15), trailCandle('15:10', 90, 90, 90, 90)];
+  await session.refresh();
+  await session.stop();
+  const exits = store.decisions.filter((d) => d.kind === 'EXIT');
+  assert.deepEqual(exits.map((d) => [d.flow, d.reason, d.price, d.time]).sort(),
+    [['fixed', 'EOD', 100.15, '15:07'], ['trail', 'EOD', 100.15, '15:07']]);
 });
 
 // Blind minutes through completed candles.
@@ -259,9 +277,9 @@ test('blind short candle: high checked against the SL first, fills at the SL lev
   assert.equal(store.decisions[0].pnl, -0.5);
 });
 
-test('a missed candle at sessionEnd books the trail EOD at that candle close', async () => {
+test('a missed candle before sessionEnd books the trail EOD at that candle close', async () => {
   const store = savedStore(savedTrail());
-  const candles = [...LONG_RANGE, entryCandle, trailCandle('15:14', 100.4, 100.45, 100.2, 100.3)];
+  const candles = [...LONG_RANGE, entryCandle, trailCandle('15:09', 100.4, 100.45, 100.2, 100.3)];
   const { session, settle } = harness({ candles, store });
   await session.start();
   await settle();

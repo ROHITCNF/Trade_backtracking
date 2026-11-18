@@ -12,7 +12,7 @@ decides the entry and sets the levels.
 
 **One exception, by design (D24): once a position is open, live manages it on the
 socket's prices.** The first tick at or through the stop or target closes it at that
-tick's price; the first tick at `sessionEnd` closes it as EOD. Entries fill at the
+tick's price; the first tick at or after `sessionEnd` closes it as EOD (`sessionEnd` is exclusive, D27: such a tick builds no candle and opens nothing). Entries fill at the
 breakout tick's price too. A 1-minute backtest can't see the order of prices inside a
 candle and assumes the worst; live can see it, so it never re-asks the engine while it
 holds (which would also let a whipsaw candle swap a stopped-out long for a short).
@@ -56,7 +56,7 @@ Before launch, during a disconnect, or after a restart, no ticks exist for those
 minutes. On warm start, reconnect and the end-of-day refresh, an open position is
 checked against the REST candles from the last minute live watched (or its entry
 minute): the engine's rules apply there — stop wins a candle that touches both, fills
-at the level, EOD at the `sessionEnd` candle's close. A breakout found only in REST
+at the level, EOD at the close of the last candle before `sessionEnd`; candles at or after it are never scanned. A breakout found only in REST
 candles fills where the backtest would. A restart restores an open position's levels
 from `paper_trades` (or the state file), never from the engine.
 

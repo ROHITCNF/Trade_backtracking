@@ -26,7 +26,7 @@ live position is open, live manages it on tick prices.
 Plus:
 - **One trade per day**, no re-entry after an exit.
 - Opening range = 09:15–09:29 IST (`orbStart` inclusive, `orbEnd` exclusive). Entries from `orbEnd`.
-- Open positions close at `sessionEnd` as `EOD`.
+- `sessionEnd` is exclusive (D27): candles at or after it are never traded; open positions close as `EOD` at the close of the last candle before it (live: the first tick at or after it).
 - **Stop-mode asymmetry is deliberate.** In `computeStop`, "closer to entry" is `Math.max` for longs and `Math.min` for shorts. Don't "fix" it.
 
 ## Time

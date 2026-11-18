@@ -16,7 +16,7 @@ const { round } = require('../src/util');
 // The engine decides the entry. From then on the position is managed here, on
 // the prices the socket actually delivers (D24): the first tick at or through
 // the stop or target closes it at that tick's price, and the first tick at
-// sessionEnd closes it as EOD. The backtest can't see the order of prices
+// sessionEnd (exclusive, D27) closes it as EOD. The backtest can't see the order of prices
 // inside a minute; live can, so live never re-asks the engine once it holds.
 //
 // While live is blind (before launch, during a disconnect, after a restart),
@@ -51,12 +51,13 @@ function tickExit(position, price, minute, sessionEndMin) {
 
 // The exit a REST candle implies for a position live couldn't watch: the
 // engine's rule (stop first on a candle touching both, fill at the level),
-// then EOD at the close of the sessionEnd candle.
+// then EOD at the close of the candle before sessionEnd: sessionEnd is
+// exclusive (D27), so that close is the price at sessionEnd.
 function candleExit(position, [, , h, l, c], minute, sessionEndMin) {
   const long = position.side === 'long';
   if (long ? l <= position.sl : h >= position.sl) return { reason: 'SL', price: position.sl };
   if (position.target != null && (long ? h >= position.target : l <= position.target)) return { reason: 'TARGET', price: position.target };
-  if (minute >= sessionEndMin) return { reason: 'EOD', price: c };
+  if (minute >= sessionEndMin - 1) return { reason: 'EOD', price: c };
   return null;
 }
 
@@ -181,17 +182,35 @@ function createLiveSession({
 
   const seenMinute = (symbol) => (seen.has(symbol) ? istParts(seen.get(symbol)).minute : 0);
 
+  // REST candles split at sessionEnd (exclusive, D27): only the ones before it
+  // are traded, and any candle at or after it says the session is over.
+  function sessionCandles(symbol) {
+    const before = [];
+    let over = false;
+    for (const c of books.get(symbol).completed) {
+      const minute = istParts(c[0]).minute;
+      if (minute < sessionEndMin) before.push([c, minute]);
+      else over = true;
+    }
+    return { before, over };
+  }
+
+  // The session is over but the candle just before sessionEnd is missing: EOD
+  // at the close of the last one that exists, the price at sessionEnd.
+  const lastClose = (before) => before.length && { reason: 'EOD', price: before[before.length - 1][0][4], minute: before[before.length - 1][1] };
+
   function scanFixed(symbol) {
     const p = positions.get(symbol);
     if (!p) return;
-    const book = books.get(symbol);
+    const { before, over } = sessionCandles(symbol);
     const from = Math.max(toMinutes(p.entryTime), seenMinute(symbol));
-    for (const c of book.completed) {
-      const minute = istParts(c[0]).minute;
+    for (const [c, minute] of before) {
       if (minute < from) continue;
       const hit = candleExit(p, c, minute, sessionEndMin);
       if (hit) return exit(symbol, hit.price, hit.reason, minute);
     }
+    const eod = over && lastClose(before);
+    if (eod) exit(symbol, eod.price, eod.reason, eod.minute);
   }
 
   // The trail on blind candles: the current stop first (fill at the level),
@@ -201,18 +220,20 @@ function createLiveSession({
     if (!trails.has(symbol)) return;
     const t0 = trails.get(symbol);
     const from = Math.max(toMinutes(t0.entryTime), seenMinute(symbol), t0.slTime ? toMinutes(t0.slTime) : 0);
-    for (const candle of books.get(symbol).completed) {
-      const [ts, , h, l, c] = candle;
-      const minute = istParts(ts).minute;
+    const { before, over } = sessionCandles(symbol);
+    for (const [candle, minute] of before) {
+      const [, , h, l, c] = candle;
       if (minute < from) continue;
       const t = trails.get(symbol);
       const steppedHere = t.slTime != null && minute === toMinutes(t.slTime);
       const hit = steppedHere
-        ? minute >= sessionEndMin && { reason: 'EOD', price: c }
+        ? minute >= sessionEndMin - 1 && { reason: 'EOD', price: c }
         : candleExit(t, candle, minute, sessionEndMin);
       if (hit) return exitTrail(symbol, hit.price, hit.reason, minute);
       stepTrail(symbol, t.side === 'long' ? h : l, minute);
     }
+    const eod = over && lastClose(before);
+    if (eod) exitTrail(symbol, eod.price, eod.reason, eod.minute);
   }
 
   // FLAT: ask the engine whether a breakout has happened. A breakout on the
@@ -256,11 +277,16 @@ function createLiveSession({
     // Ignore anything outside the session. Outside market hours the feed keeps
     // replaying the last snapshot, which must not build candles or trades.
     const { minute, date: tickDate } = istParts(ts);
-    if (tickDate !== date || minute < orbStartMin || minute > sessionEndMin) return;
-    lastTickAt = ts;
-    const moved = book.addTick(ltp, ts);
+    if (tickDate !== date || minute < orbStartMin) return;
     const state = status.get(symbol);
-    if (state === 'OPEN' && isOpen(symbol)) {
+    const holding = state === 'OPEN' && isOpen(symbol);
+    // sessionEnd is exclusive (D27): a tick at or after it only closes what is
+    // still held (the first one, however late). It builds no candle and can't
+    // open a position.
+    if (minute >= sessionEndMin && !holding) return;
+    lastTickAt = ts;
+    const moved = minute < sessionEndMin && book.addTick(ltp, ts);
+    if (holding) {
       // Holding: every tick is checked against each position's own levels.
       seen.set(symbol, ts);
       if (positions.has(symbol)) {
