@@ -58,6 +58,9 @@ function compare(live, bt, day = { at: new Map(), high: null, low: null }) {
   const liveExit = minuteOf(live.exit_time ?? live.exitTime);
   const btExit = minuteOf(bt.exitTime);
   if (live.reason === bt.reason && liveExit === btExit) return { kind: 'match' };
+  // Both held to the close: the backtest books EOD on the candle before
+  // sessionEnd (15:09), live on its first tick at or after it (15:10+), D27.
+  if (live.reason === 'EOD' && bt.reason === 'EOD') return { kind: 'match' };
   const levels = { side: bt.side, sl: bt.sl, target: bt.target };
   if (touchedBoth(day.at.get(btExit), levels) || touchedBoth(day.at.get(liveExit), levels)) {
     return tick('one candle touched both stop and target; the backtest assumes the stop, live saw which came first');
