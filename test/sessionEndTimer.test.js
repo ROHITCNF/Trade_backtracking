@@ -29,6 +29,7 @@ function memoryStore(initial = null) {
 // Fake clock and timer: records every setTimer call, fires only when the test says so.
 function harness({ candles = RANGE, symbols = [SYM], cfg = config(), nowMs = ms('09:12'), store = memoryStore() } = {}) {
   const feed = {};
+  const clock = { ms: nowMs };
   const timers = [];
   const cleared = [];
   const session = createLiveSession({
@@ -38,14 +39,15 @@ function harness({ candles = RANGE, symbols = [SYM], cfg = config(), nowMs = ms(
     date: DATE,
     log: () => {},
     socketToken: async () => 'app:token',
-    warmStart: async (syms, onSymbol) => { for (const s of syms) onSymbol(s, candles); },
+    warmStart: async (syms, onSymbol) => { for (const s of syms) onSymbol(s, s === FLAT ? RANGE : candles); }, // FLAT never breaks out
     startFeed: (opts) => { Object.assign(feed, opts); return { close() {} }; },
-    now: () => nowMs,
+    now: () => clock.ms,
     setTimer: (fn, delay) => { const handle = { id: timers.length + 1 }; timers.push({ fn, delay, handle }); return handle; },
     clearTimer: (h) => { cleared.push(h); },
   });
-  const fire = async (i = 0) => { await timers[i].fn(); await session.stop(); };
-  return { session, store, feed, timers, cleared, fire };
+  // The timer fires at 15:10:00, so the clock moves there first.
+  const fire = async (i = 0) => { clock.ms = SESSION_END_MS; await timers[i].fn(); await session.stop(); };
+  return { session, store, feed, timers, cleared, fire, clock };
 }
 
 const exits = (store) => store.decisions.filter((d) => d.kind === 'EXIT');
@@ -118,8 +120,10 @@ test('with trail enabled the timer closes both fixed and trail at the same last 
 
 test('a position with no tick after entry closes at the last completed candle close before sessionEnd', async () => {
   const candles = [...RANGE, candle(DATE, '09:30', 100, 102, 100, 101.5), candle(DATE, '14:58', 101.5, 101.7, 101.4, 101.6)];
-  const { session, store, fire } = harness({ candles, cfg: config({ trail: TRAIL }) });
+  const { session, store, feed, fire } = harness({ candles, symbols: [SYM, FLAT], cfg: config({ trail: TRAIL }) });
   await session.start();
+  feed.onOpen();
+  feed.onTick(FLAT, 100, at('15:09') + 30); // the feed is live; SYM is just quiet
   await new Promise((r) => setImmediate(r)); // let the write queue drain
   assert.deepEqual(store.decisions.filter((d) => d.kind === 'ENTRY').map((d) => d.flow), ['fixed', 'trail']);
   assert.equal(exits(store).length, 0);
@@ -131,10 +135,62 @@ test('a position with no tick after entry closes at the last completed candle cl
 
 test('a warm-started fixed position with a mid-day last candle closes at that candle close', async () => {
   const candles = [...RANGE, candle(DATE, '09:30', 100, 102, 100, 101.5), candle(DATE, '11:00', 101.5, 101.8, 101.2, 101.3)];
-  const { session, store, fire } = harness({ candles });
+  const { session, store, feed, fire } = harness({ candles, symbols: [SYM, FLAT] });
   await session.start();
+  feed.onOpen();
+  feed.onTick(FLAT, 100, at('15:09') + 30);
   await fire();
-  assert.deepEqual(exits(store).map(brief), [['fixed', 'EOD', 101.3, '15:10']]);
+  assert.deepEqual(exits(store).filter((d) => d.symbol === SYM).map(brief), [['fixed', 'EOD', 101.3, '15:10']]);
+});
+
+// Blind at 15:10: the books may be stale, so the timer books nothing and the
+// end-of-day refresh decides from REST candles (#163 review).
+
+
+test('feed never connected: the timer books nothing; refresh books the SL a later REST candle hit', async () => {
+  let candles = [...RANGE, candle(DATE, '09:30', 100, 102, 100, 101.5)];
+  const store = memoryStore();
+  const timers = [];
+  let nowMs = ms('09:12');
+  const session = createLiveSession({
+    symbols: [SYM], config: config(), store, date: DATE, log: () => {},
+    socketToken: async () => 'app:token',
+    warmStart: async (syms, onSymbol) => onSymbol(SYM, candles),
+    startFeed: () => ({ close() {} }),
+    now: () => nowMs,
+    setTimer: (fn) => { timers.push(fn); return {}; },
+    clearTimer: () => {},
+  });
+  await session.start();
+  nowMs = SESSION_END_MS;
+  await timers[0]();
+  await new Promise((r) => setImmediate(r));
+  assert.equal(exits(store).length, 0, 'blind: nothing booked on stale books');
+  candles = [...candles, candle(DATE, '14:00', 101, 101, 98, 98.5), candle(DATE, '15:09', 98.5, 99, 98, 98.6), candle(DATE, '15:10', 98.6, 98.6, 98.6, 98.6)];
+  await session.refresh();
+  await session.stop();
+  const [x] = exits(store);
+  assert.equal(x.reason, 'SL');
+  assert.equal(x.time, '14:00');
+});
+
+test('feed closed before 15:10: the timer books nothing', async () => {
+  const { session, store, feed, fire } = harness({ candles: [...RANGE, candle(DATE, '09:30', 100, 102, 100, 101.5)] });
+  await session.start();
+  feed.onOpen();
+  feed.onTick(SYM, 101.4, at('13:00'));
+  feed.onClose();
+  await fire();
+  assert.equal(exits(store).length, 0);
+});
+
+test('a silent but connected feed (no tick for over a minute) is blind: the timer books nothing', async () => {
+  const { session, store, feed, fire } = harness({ candles: [...RANGE, candle(DATE, '09:30', 100, 102, 100, 101.5)] });
+  await session.start();
+  feed.onOpen();
+  feed.onTick(SYM, 101.4, at('13:00'));
+  await fire();
+  assert.equal(exits(store).length, 0);
 });
 
 test('a later tick price wins over an earlier candle close', async () => {
@@ -142,7 +198,7 @@ test('a later tick price wins over an earlier candle close', async () => {
   const { session, store, feed, fire } = harness({ candles });
   await session.start();
   feed.onOpen();
-  feed.onTick(SYM, 101.2, at('14:00'));
+  feed.onTick(SYM, 101.2, at('15:09') + 30);
   await fire();
   assert.deepEqual(exits(store).map(brief), [['fixed', 'EOD', 101.2, '15:10']]);
 });
