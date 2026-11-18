@@ -12,7 +12,7 @@ decides the entry and sets the levels.
 
 **One exception, by design (D24): once a position is open, live manages it on the
 socket's prices.** The first tick at or through the stop or target closes it at that
-tick's price; the first tick at or after `sessionEnd` closes it as EOD (`sessionEnd` is exclusive, D27: such a tick builds no candle and opens nothing). Entries fill at the
+tick's price; the first tick at or after `sessionEnd` closes it as EOD (`sessionEnd` is exclusive, D27: such a tick builds no candle and opens nothing). A timer at `sessionEnd` (15:10:00) also closes everything still held at its last known price, the forming candle's or the last completed close, so a quiet symbol doesn't wait for a tick (#160). Only while the feed is live (connected, not refilling after a reconnect, a tick within the last minute): blind, the books may be stale, so everything is left to the end-of-day refresh's REST candles. Entries fill at the
 breakout tick's price too. A 1-minute backtest can't see the order of prices inside a
 candle and assumes the worst; live can see it, so it never re-asks the engine while it
 holds (which would also let a whipsaw candle swap a stopped-out long for a short).
