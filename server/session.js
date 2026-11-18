@@ -6,7 +6,7 @@
 // See server/architecture.md for why it is shaped this way.
 
 const { runBacktest } = require('../src/engine');
-const { toMinutes, istParts, istToday } = require('../src/time');
+const { toMinutes, istParts, istToday, dateToEpoch } = require('../src/time');
 const { CandleBuilder } = require('./candles');
 const { createPaperBroker } = require('./broker/paper');
 const { trailStop, improve } = require('./trail');
@@ -74,6 +74,10 @@ function createLiveSession({
   socketToken = require('../src/fyers').socketToken,
   date = istToday(),
   log = console.log,
+  now = () => Date.now(),
+  // unref: a pending close never keeps a process alive on its own.
+  setTimer = (fn, ms) => setTimeout(fn, ms).unref(),
+  clearTimer = clearTimeout,
 }) {
   const sessionEndMin = toMinutes(config.sessionEnd);
   const orbStartMin = toMinutes(config.orbStart);
@@ -92,6 +96,7 @@ function createLiveSession({
   let connects = 0;
   let lastTickAt = null;
   let running = false;
+  let closeTimer = null;
 
   // Writes run one after another, so a slow store can never land an older
   // state on top of a newer one. Decisions are already final in memory by the
@@ -236,6 +241,30 @@ function createLiveSession({
     if (eod) exitTrail(symbol, eod.price, eod.reason, eod.minute);
   }
 
+  // The last price live knows before sessionEnd: the forming candle's (the
+  // last tick) or the last completed candle's close. Null with no candles.
+  function lastPrice(symbol) {
+    const before = books.get(symbol).candles().filter((c) => istParts(c[0]).minute < sessionEndMin);
+    return before.length ? before[before.length - 1][4] : null;
+  }
+
+  // At sessionEnd (15:10:00, D27) everything still held closes as EOD on its
+  // last known price, whether or not a tick arrives at or after it (#160). A
+  // symbol with no price at all is left to the end-of-day refresh.
+  function closeAtSessionEnd() {
+    closeTimer = null;
+    for (const symbol of symbols) {
+      if (!isOpen(symbol)) continue;
+      const price = lastPrice(symbol);
+      if (price == null) {
+        log(`  ${symbol}: no price at ${config.sessionEnd}; left for the end-of-day refresh`);
+        continue;
+      }
+      if (positions.has(symbol)) exit(symbol, price, 'EOD', sessionEndMin);
+      if (trails.has(symbol)) exitTrail(symbol, price, 'EOD', sessionEndMin);
+    }
+  }
+
   // FLAT: ask the engine whether a breakout has happened. A breakout on the
   // tick being handled fills at that tick's price; one found only in candles
   // (live was blind when it happened) fills where the backtest would, and its
@@ -348,6 +377,13 @@ function createLiveSession({
     log(`Evaluated warm-start candles. Open: ${open}, closed today: ${closed}.`);
     if (!running) return; // stopped during warm start
 
+    // Only a session for today closes on the clock; one replaying another
+    // day (tests, a stale host) leaves its exits to ticks and candles.
+    if (istParts(Math.floor(now() / 1000)).date === date) {
+      const closeAt = (dateToEpoch(date) + sessionEndMin * 60) * 1000;
+      closeTimer = setTimer(closeAtSessionEnd, Math.max(0, closeAt - now()));
+    }
+
     socket = startFeed({
       token,
       symbols,
@@ -369,6 +405,10 @@ function createLiveSession({
   // Closes the feed and waits for pending state writes. Safe to call twice.
   async function stop() {
     running = false;
+    if (closeTimer) {
+      clearTimer(closeTimer);
+      closeTimer = null;
+    }
     if (socket) {
       try { socket.close(); } catch (err) { log(`  feed close failed: ${err.message}`); }
       socket = null;
