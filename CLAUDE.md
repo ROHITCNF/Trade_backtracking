@@ -102,7 +102,9 @@ Per trading day, on 1-minute candles:
 - Target is set by `targetMode`: `'R'` is `targetR` × stop distance, `'pct'` is `targetPct`% of
   entry, `'none'` means stop-or-close only. When `slMode` is `'pct'`, R and % coincide — a `1R`
   target and a `fixed 1%` target produce identical trades, which is a useful engine sanity check.
-- Open positions close at `sessionEnd`, booked as an `EOD` exit.
+- `sessionEnd` (`15:10`) is exclusive, like `orbEnd` (D27): no entry on a candle at or after it, and
+  open positions are booked `EOD` at the close of the last candle before it, the price at 15:10:00.
+  Live closes on the first tick at or after `sessionEnd`.
 
 `npm run sweep` re-runs the same candles across every target rule and prints a comparison table.
 Entries and stops are identical across rows; only the target varies.

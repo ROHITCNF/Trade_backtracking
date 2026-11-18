@@ -95,9 +95,10 @@ no background workers or cron, so an outside service does the waking:
 | 09:00 | first ping wakes the instance |
 | before 09:15 | **you** sign in and click Connect Fyers; the token dies at 06:30 every morning |
 | 09:10 → | with a token, the session starts: warm start pulls today's candles (~39 calls), then the websocket |
-| 09:15–15:14 | breakouts, stops and targets are written to `paper_trades` as the engine decides them |
-| 15:19 | end-of-day REST pull books EOD exits, the session stops |
-| 15:19–15:50 | once per day: reconcile against a backtest (~39 calls); a day with no session is backfilled |
+| 09:15–15:09 | breakouts, stops and targets are written to `paper_trades` as the engine decides them |
+| 15:10 | the first tick at or after 15:10:00 closes each open trade as EOD (D27) |
+| 15:15 | end-of-day REST pull books EOD exits (15:09 close) for anything still held, the session stops |
+| 15:15–15:50 | once per day: reconcile against a backtest (~39 calls); a day with no session is backfilled |
 
 Connecting Fyers late is fine: the session starts within 30 s of the token
 arriving, and warm start recovers the candles it missed. A Render restart or
@@ -110,7 +111,7 @@ With `BREVO_API_KEY` and `MAIL_TO` set, the API mails (decisions.md D26):
 
 - one email each time a **fixed** paper trade on `MAIL_WATCHLIST` closes (stop, target or EOD):
   symbol, side, entry, exit, reason and net P&L;
-- one end-of-day email, about 15:19 when the session stops: today's P&L, trades taken,
+- one end-of-day email, about 15:15 when the session stops: today's P&L, trades taken,
   wins/losses, win rate and a row per trade. A day without trades still sends one.
 
 Mail goes through Brevo's HTTPS API, because Render's free plan blocks SMTP. Setup, free
@@ -121,7 +122,7 @@ keys**, then set the four variables above on the API service.
 The Live page's **Mail report** button sends the same report for the page's date at any time
 (disabled while mail is off). A failed send is logged (`mail: … failed`) and never affects the session. Only the process that
 hosted the session sends the end-of-day mail, so a restart after the close doesn't resend it.
-A restart before ~15:19 resumes the session and still sends it; it is skipped only if the
+A restart before ~15:15 resumes the session and still sends it; it is skipped only if the
 instance is down when the session stops.
 
 ### Rules
