@@ -224,6 +224,24 @@ test('warm start from candles opens both flows; refresh books EOD for both at th
   assert.equal(store.state.symbols[SYM].position, 'CLOSED');
 });
 
+test('refresh with the 15:09 candle missing books both flows EOD at the last close before sessionEnd', async () => {
+  let candles = [...LONG_RANGE, trailCandle('09:30', 99.9, 100, 99.8, 99.95)];
+  const store = memoryStore();
+  const session = createLiveSession({
+    symbols: [SYM], config: cfg(), store, date: DATE, log: () => {},
+    socketToken: async () => 'app:token',
+    warmStart: async (symbols, onSymbol) => onSymbol(SYM, candles),
+    startFeed: () => ({ close() {} }),
+  });
+  await session.start();
+  candles = [...candles, trailCandle('15:07', 100.1, 100.2, 100, 100.15), trailCandle('15:10', 90, 90, 90, 90)];
+  await session.refresh();
+  await session.stop();
+  const exits = store.decisions.filter((d) => d.kind === 'EXIT');
+  assert.deepEqual(exits.map((d) => [d.flow, d.reason, d.price, d.time]).sort(),
+    [['fixed', 'EOD', 100.15, '15:07'], ['trail', 'EOD', 100.15, '15:07']]);
+});
+
 // Blind minutes through completed candles.
 
 test('blind candle that breaches the SL and would step: SL exit at the SL level, no TRAIL', async () => {

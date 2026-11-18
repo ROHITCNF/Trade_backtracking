@@ -18,7 +18,7 @@ Each trading day, the high and low of 09:15–09:29 IST form the opening range. 
 first candle that breaks the high goes long, or the low goes short (`direction`). One trade
 per day. The stop is a percentage of entry, the opposite range edge, or the tighter or wider
 of the two (`slMode`). The target is a multiple of risk, a percentage, or none
-(`targetMode`). Anything still open closes at 15:14. The modelling is pessimistic on
+(`targetMode`). Anything still open closes at 15:10:00 (the close of the 15:09 candle). The modelling is pessimistic on
 purpose: gaps fill at the open, a candle touching both stop and target counts as a stop,
 and a bar breaking both edges is skipped.
 

@@ -277,13 +277,14 @@ function createLiveSession({
     // Ignore anything outside the session. Outside market hours the feed keeps
     // replaying the last snapshot, which must not build candles or trades.
     const { minute, date: tickDate } = istParts(ts);
-    if (tickDate !== date || minute < orbStartMin || minute > sessionEndMin) return;
-    lastTickAt = ts;
+    if (tickDate !== date || minute < orbStartMin) return;
     const state = status.get(symbol);
     const holding = state === 'OPEN' && isOpen(symbol);
-    // sessionEnd is exclusive (D27): a tick at it only closes what is held.
-    // It builds no candle and can't open a position.
+    // sessionEnd is exclusive (D27): a tick at or after it only closes what is
+    // still held (the first one, however late). It builds no candle and can't
+    // open a position.
     if (minute >= sessionEndMin && !holding) return;
+    lastTickAt = ts;
     const moved = minute < sessionEndMin && book.addTick(ltp, ts);
     if (holding) {
       // Holding: every tick is checked against each position's own levels.
