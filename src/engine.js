@@ -119,7 +119,9 @@ function simulateDay(date, candles, config) {
 
   const entryFrom = toMinutes(config.orbEnd);
   const exitBy = toMinutes(config.sessionEnd);
-  const tradable = candles.filter((c) => c.minute >= entryFrom && c.minute <= exitBy);
+  // sessionEnd is exclusive, like orbEnd (D27): the last candle traded is the one
+  // before it, and a position still open is booked EOD at that candle's close.
+  const tradable = candles.filter((c) => c.minute >= entryFrom && c.minute < exitBy);
   if (tradable.length === 0) return null;
 
   let position = null;

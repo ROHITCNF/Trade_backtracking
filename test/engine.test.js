@@ -68,14 +68,14 @@ test('target exit books the target price', () => {
   assert.equal(t.rMultiple, 1);
 });
 
-test('open position closes at sessionEnd as EOD', () => {
+test('open position closes at the close of the candle before sessionEnd as EOD', () => {
   const [t] = runBacktest(
-    day(candle(D, '09:30', 100.5, 101.2, 100.5, 101), candle(D, '15:14', 101.3, 101.4, 101.2, 101.3), candle(D, '15:20', 105, 105, 105, 105)),
+    day(candle(D, '09:30', 100.5, 101.2, 100.5, 101), candle(D, '15:09', 101.3, 101.4, 101.2, 101.3), candle(D, '15:10', 105, 105, 105, 105)),
     config({ targetMode: 'none' })
   );
   assert.equal(t.reason, 'EOD');
   assert.equal(t.exit, 101.3);
-  assert.equal(t.exitTime, '15:14');
+  assert.equal(t.exitTime, '15:09');
 });
 
 test('one trade per day, no re-entry after an exit', () => {
@@ -118,7 +118,7 @@ test('entryPrice sizing: capital x leverage / entry, never zero', () => {
 
 test('costs come off P&L', () => {
   const bar = candle(D, '09:30', 100.5, 101.2, 100.5, 101);
-  const close = candle(D, '15:14', 102, 102, 102, 102);
+  const close = candle(D, '15:09', 102, 102, 102, 102);
   const [t] = runBacktest(day(bar, close), config({ targetMode: 'none', costBps: 10 }));
   assert.equal(t.pnl, round(1 - (101 + 102) * 0.001)); // engine rounds to 2 dp
 });
