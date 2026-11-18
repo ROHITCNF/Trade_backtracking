@@ -282,3 +282,39 @@ test('a session whose date is not today by now() schedules no timer (earlier dat
   assert.equal(timers.length, 0);
   await session.stop();
 });
+
+test('a reconnect still refilling the books at 15:10 is blind: the timer books nothing', async () => {
+  const candles = [...RANGE, candle(DATE, '09:30', 100, 102, 100, 101.5)];
+  const store = memoryStore();
+  const timers = [];
+  const feed = {};
+  let nowMs = ms('09:12');
+  let pulls = 0;
+  let release;
+  const session = createLiveSession({
+    symbols: [SYM], config: config(), store, date: DATE, log: () => {},
+    socketToken: async () => 'app:token',
+    // The first pull (launch) answers at once; the reconnect's hangs until released.
+    warmStart: async (syms, onSymbol) => {
+      if (pulls++ > 0) await new Promise((r) => { release = r; });
+      onSymbol(SYM, candles);
+    },
+    startFeed: (opts) => { Object.assign(feed, opts); return { close() {} }; },
+    now: () => nowMs,
+    setTimer: (fn) => { timers.push(fn); return {}; },
+    clearTimer: () => {},
+  });
+  await session.start();
+  feed.onOpen();
+  feed.onTick(SYM, 101.4, at('15:09') + 20);
+  feed.onClose();
+  const reconnect = feed.onOpen(); // backfill pending
+  feed.onTick(SYM, 101.3, at('15:09') + 40);
+  nowMs = SESSION_END_MS;
+  await timers[0]();
+  await new Promise((r) => setImmediate(r));
+  assert.equal(exits(store).length, 0, 'books not refilled yet');
+  release();
+  await reconnect;
+  await session.stop();
+});
